@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, jsonb, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -103,6 +103,56 @@ export const alertNotifications = pgTable("alert_notifications", {
   metadata: jsonb("metadata"),
 });
 
+// Badge definitions table - contains the available badge types and requirements
+export const badgeDefinitions = pgTable("badge_definitions", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(), // Unique code for the badge (e.g., 'first_trade', 'profitable_month')
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(), // 'achievement', 'milestone', 'streak', 'performance', etc.
+  level: integer("level").notNull().default(1), // For tiered badges (bronze, silver, gold)
+  maxLevel: integer("max_level").notNull().default(1), // Maximum level this badge can reach
+  iconUrl: text("icon_url").notNull(),
+  criteria: jsonb("criteria").notNull(), // JSON with threshold values and conditions
+  points: integer("points").notNull().default(10), // Points awarded for earning this badge
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  isActive: boolean("is_active").notNull().default(true),
+  metadata: jsonb("metadata"),
+});
+
+// User badges table - tracks which badges users have earned
+export const userBadges = pgTable("user_badges", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  badgeId: integer("badge_id").notNull(), // Reference to badge_definitions
+  earnedAt: timestamp("earned_at").notNull().defaultNow(),
+  currentLevel: integer("current_level").notNull().default(1),
+  progress: jsonb("progress").notNull(), // JSON with progress stats toward next level
+  isNew: boolean("is_new").notNull().default(true), // Whether the user has seen this badge yet
+  firstEarnedAt: timestamp("first_earned_at").notNull().defaultNow(), // When first earned (doesn't change on level ups)
+  metadata: jsonb("metadata"),
+});
+
+// Trading goals table - defines personal trading goals that can earn badges
+export const tradingGoals = pgTable("trading_goals", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  targetType: text("target_type").notNull(), // 'profit', 'win_rate', 'trade_count', etc.
+  targetValue: text("target_value").notNull(), // The numeric goal value
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"),
+  isCompleted: boolean("is_completed").notNull().default(false),
+  completedAt: timestamp("completed_at"),
+  progress: jsonb("progress").notNull(), // JSON with current progress stats
+  badgeId: integer("badge_id"), // Optional badge to award on completion
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  metadata: jsonb("metadata"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -180,6 +230,45 @@ export const insertAlertNotificationSchema = createInsertSchema(alertNotificatio
   metadata: true,
 });
 
+// Badge schemas
+export const insertBadgeDefinitionSchema = createInsertSchema(badgeDefinitions).pick({
+  code: true,
+  name: true,
+  description: true,
+  category: true,
+  level: true,
+  maxLevel: true,
+  iconUrl: true,
+  criteria: true,
+  points: true,
+  isActive: true,
+  metadata: true,
+});
+
+export const insertUserBadgeSchema = createInsertSchema(userBadges).pick({
+  userId: true,
+  badgeId: true,
+  currentLevel: true,
+  progress: true,
+  isNew: true,
+  metadata: true,
+});
+
+export const insertTradingGoalSchema = createInsertSchema(tradingGoals).pick({
+  userId: true,
+  title: true,
+  description: true,
+  targetType: true,
+  targetValue: true,
+  startDate: true,
+  endDate: true,
+  isCompleted: true,
+  completedAt: true,
+  progress: true,
+  badgeId: true,
+  metadata: true,
+});
+
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
@@ -189,6 +278,9 @@ export type InsertTradingPosition = z.infer<typeof insertTradingPositionSchema>;
 export type InsertEventLog = z.infer<typeof insertEventLogSchema>;
 export type InsertAlertTrigger = z.infer<typeof insertAlertTriggerSchema>;
 export type InsertAlertNotification = z.infer<typeof insertAlertNotificationSchema>;
+export type InsertBadgeDefinition = z.infer<typeof insertBadgeDefinitionSchema>;
+export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
+export type InsertTradingGoal = z.infer<typeof insertTradingGoalSchema>;
 
 export type User = typeof users.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
@@ -198,3 +290,6 @@ export type TradingPosition = typeof tradingPositions.$inferSelect;
 export type EventLog = typeof eventLogs.$inferSelect;
 export type AlertTrigger = typeof alertTriggers.$inferSelect;
 export type AlertNotification = typeof alertNotifications.$inferSelect;
+export type BadgeDefinition = typeof badgeDefinitions.$inferSelect;
+export type UserBadge = typeof userBadges.$inferSelect;
+export type TradingGoal = typeof tradingGoals.$inferSelect;

@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from 'ws';
 import { storage } from "./storage";
-import { insertChatMessageSchema, insertContextMemorySchema, insertAlertTriggerSchema } from "@shared/schema";
+import { insertChatMessageSchema, insertContextMemorySchema, insertAlertTriggerSchema, insertTradingGoalSchema } from "@shared/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
@@ -13,12 +13,20 @@ import { getTechnicalAnalysis } from "./services/technicalAnalysis";
 import { getCorporateActions } from "./services/corporateActions";
 import { getMarketData } from "./services/marketData";
 import { getAnthropicCompletion } from "./services/anthropic";
-import { connectBroker, getBrokerData } from "./services/broker";
+import { connectBroker, completeBrokerAuth, getBrokerData, BrokerType } from "./services/broker";
+import { InsertBrokerConnection, InsertTradingGoal } from "@shared/schema";
 import { saveToMemory, retrieveFromMemory } from "./services/mcp";
+import { seedBadgeDefinitions } from "./services/badgeService";
+import * as badgeService from "./services/badgeService";
+import * as goalService from "./services/goalService";
+import * as eventService from "./services/eventService";
 // New AI and Mathematical Models
 import { optimizePortfolio } from "./services/portfolioOptimization";
 import { runMonteCarloSimulation, simulateStrategy } from "./services/monteCarloSimulation";
 import { detectAnomalies } from "./services/anomalyDetection";
+import * as tradingEngine from "./services/tradingEngine";
+import { createSensitivityModel, compareSensitivity, findStocksWithSensitivity, analyzePortfolioSensitivity } from "./services/sensitivityModeling";
+import { createStrategy, updateStrategy, getStrategy, listStrategies, deleteStrategy, runBacktest } from "./services/strategyBuilder";
 // Alert system
 import { 
   getAlertsByUser,
@@ -242,6 +250,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ authUrl });
     } catch (error) {
       res.status(500).json({ message: "Failed to connect broker" });
+    }
+  });
+  
+  // Complete broker authorization (for demo purposes only)
+  app.post("/api/broker/authorize", async (req: Request, res: Response) => {
+    try {
+      const broker = "zerodha";
+      const authCode = "demo_auth_code_" + Math.random().toString(36).substring(2, 10);
+      
+      // For demo purposes, always create a new broker connection if one doesn't exist
+      let connection;
+      try {
+        connection = await completeBrokerAuth(DEFAULT_USER_ID, broker as BrokerType, authCode);
+      } catch (error) {
+        // If completeBrokerAuth fails (likely no existing connection), create one directly
+        const brokerConnection: InsertBrokerConnection = {
+          userId: DEFAULT_USER_ID,
+          broker,
+          authToken: `auth_${Math.random().toString(36).substring(2, 15)}`,
+          refreshToken: `refresh_${Math.random().toString(36).substring(2, 15)}`,
+          isActive: true,
+          metadata: { 
+            status: "connected",
+            connectedAt: new Date().toISOString()
+          }
+        };
+        
+        connection = await storage.createBrokerConnection(brokerConnection);
+        
+        // Log the event
+        await storage.createEventLog({
+          userId: DEFAULT_USER_ID,
+          eventType: "broker_connected",
+          details: { 
+            broker,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully connected to ${broker}`,
+        connection
+      });
+    } catch (error) {
+      console.error('Error authorizing broker:', error);
+      res.status(500).json({ message: "Failed to authorize broker" });
     }
   });
   
@@ -639,6 +695,379 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // --------------- ML-BASED INDEX SENSITIVITY MODELING API ENDPOINTS ---------------
+  
+  // Create sensitivity model for a single stock
+  app.post("/api/sensitivity/model", async (req: Request, res: Response) => {
+    try {
+      const {
+        symbol,
+        index,
+        lookbackPeriod,
+        includeStressTests,
+        includeForecast,
+        forecastPeriod,
+        modelComplexity
+      } = req.body;
+      
+      if (!symbol) {
+        return res.status(400).json({ message: "Symbol is required" });
+      }
+      
+      const sensitivityModel = await createSensitivityModel({
+        symbol,
+        index,
+        lookbackPeriod,
+        includeStressTests,
+        includeForecast,
+        forecastPeriod,
+        modelComplexity: modelComplexity || 'moderate'
+      });
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "sensitivity_model_created",
+        details: {
+          symbol,
+          index: sensitivityModel.index,
+          beta: sensitivityModel.metrics.beta,
+          mlSensitivity: sensitivityModel.metrics.mlSensitivity,
+        }
+      });
+      
+      res.json(sensitivityModel);
+    } catch (error) {
+      console.error("Error creating sensitivity model:", error);
+      res.status(500).json({ message: "Failed to create sensitivity model" });
+    }
+  });
+  
+  // Compare multiple stocks based on their sensitivity to an index
+  app.post("/api/sensitivity/compare", async (req: Request, res: Response) => {
+    try {
+      const { symbols, index, modelComplexity } = req.body;
+      
+      if (!symbols || !Array.isArray(symbols) || symbols.length === 0) {
+        return res.status(400).json({ message: "Symbols array is required" });
+      }
+      
+      const sensitivityModels = await compareSensitivity(
+        symbols,
+        index,
+        modelComplexity || 'moderate'
+      );
+      
+      // Generate quick comparison summary
+      const comparisonSummary = sensitivityModels.map(model => ({
+        symbol: model.symbol,
+        beta: model.metrics.beta,
+        mlSensitivity: model.metrics.mlSensitivity,
+        bullishExpectation: model.forecast.bullishMarket,
+        bearishExpectation: model.forecast.bearishMarket, 
+        r2: model.metrics.r2,
+        consistencyScore: model.historicalPerformance.consistencyScore
+      }));
+      
+      // Sort by beta in descending order
+      comparisonSummary.sort((a, b) => b.beta - a.beta);
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "sensitivity_comparison",
+        details: {
+          symbols,
+          index: index || 'default',
+          modelCount: sensitivityModels.length
+        }
+      });
+      
+      res.json({
+        models: sensitivityModels,
+        summary: comparisonSummary,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error comparing sensitivities:", error);
+      res.status(500).json({ message: "Failed to compare sensitivities" });
+    }
+  });
+  
+  // Find stocks with specific sensitivity characteristics
+  app.post("/api/sensitivity/screen", async (req: Request, res: Response) => {
+    try {
+      const { 
+        availableSymbols,
+        targetBeta,
+        betaRange,
+        targetCorrelation,
+        correlationRange,
+        outperformedIndex,
+        consistencyThreshold 
+      } = req.body;
+      
+      if (!availableSymbols || !Array.isArray(availableSymbols) || availableSymbols.length === 0) {
+        return res.status(400).json({ message: "Available symbols array is required" });
+      }
+      
+      // Filter criteria
+      const criteria = {
+        targetBeta,
+        betaRange,
+        targetCorrelation,
+        correlationRange,
+        outperformedIndex,
+        consistencyThreshold
+      };
+      
+      const result = await findStocksWithSensitivity(availableSymbols, criteria);
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "sensitivity_screening",
+        details: {
+          criteriaCount: Object.keys(criteria).filter(k => criteria[k] !== undefined).length,
+          symbolsScreened: availableSymbols.length,
+          matchesFound: result.matchingStocks.length
+        }
+      });
+      
+      res.json({
+        matchingStocks: result.matchingStocks,
+        sensitivityModels: result.sensitivityModels,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error screening for sensitivities:", error);
+      res.status(500).json({ message: "Failed to screen for sensitivities" });
+    }
+  });
+  
+  // Analyze portfolio sensitivity to indices
+  app.post("/api/sensitivity/portfolio", async (req: Request, res: Response) => {
+    try {
+      const { holdings, indices } = req.body;
+      
+      if (!holdings || !Array.isArray(holdings) || holdings.length === 0) {
+        return res.status(400).json({ message: "Holdings array is required" });
+      }
+      
+      // Ensure proper format for holdings
+      const formattedHoldings = holdings.map(holding => ({
+        symbol: holding.symbol,
+        weight: holding.weight || holding.allocation || (1 / holdings.length)
+      }));
+      
+      // Validate weights sum to approximately 1
+      const totalWeight = formattedHoldings.reduce((sum, h) => sum + h.weight, 0);
+      
+      if (Math.abs(totalWeight - 1) > 0.05) {
+        // Normalize weights to sum to 1
+        formattedHoldings.forEach(h => h.weight = h.weight / totalWeight);
+      }
+      
+      const portfolioAnalysis = await analyzePortfolioSensitivity(
+        formattedHoldings,
+        indices
+      );
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "portfolio_sensitivity_analysis",
+        details: {
+          holdingsCount: formattedHoldings.length,
+          indicesAnalyzed: indices ? indices.length : 3,
+          diversificationScore: portfolioAnalysis.diversificationScore
+        }
+      });
+      
+      res.json({
+        analysis: portfolioAnalysis,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error analyzing portfolio sensitivity:", error);
+      res.status(500).json({ 
+        message: "Failed to analyze portfolio sensitivity",
+        error: error.message 
+      });
+    }
+  });
+
+  // --------------- STRATEGY BUILDER AND BACKTESTER API ENDPOINTS ---------------
+  
+  // Get strategies for the current user
+  app.get("/api/strategies", async (req: Request, res: Response) => {
+    try {
+      const strategies = await listStrategies(DEFAULT_USER_ID);
+      res.json(strategies);
+    } catch (error) {
+      console.error("Error listing strategies:", error);
+      res.status(500).json({ message: "Failed to list strategies" });
+    }
+  });
+  
+  // Get a specific strategy by ID
+  app.get("/api/strategies/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({ message: "Strategy ID is required" });
+      }
+      
+      const strategy = await getStrategy(DEFAULT_USER_ID, id);
+      
+      if (!strategy) {
+        return res.status(404).json({ message: "Strategy not found" });
+      }
+      
+      res.json(strategy);
+    } catch (error) {
+      console.error("Error getting strategy:", error);
+      res.status(500).json({ message: "Failed to get strategy" });
+    }
+  });
+  
+  // Create a new strategy
+  app.post("/api/strategies", async (req: Request, res: Response) => {
+    try {
+      const {
+        name,
+        description,
+        symbols,
+        timeframe,
+        entryConditions,
+        exitConditions,
+        positionSizing,
+        riskManagement,
+        direction
+      } = req.body;
+      
+      // Validate required fields
+      if (!name || !symbols || !Array.isArray(symbols) || symbols.length === 0 || !timeframe) {
+        return res.status(400).json({ 
+          message: "Name, symbols array, and timeframe are required" 
+        });
+      }
+      
+      const strategy = await createStrategy(DEFAULT_USER_ID, {
+        name,
+        description: description || `Strategy created on ${new Date().toLocaleDateString()}`,
+        symbols,
+        timeframe,
+        entryConditions: entryConditions || [],
+        exitConditions: exitConditions || [],
+        positionSizing: positionSizing || { type: 'percentage', value: 5 },
+        riskManagement: riskManagement || {
+          stopLossType: 'percentage',
+          stopLossValue: 2,
+          takeProfitType: 'percentage',
+          takeProfitValue: 6
+        },
+        direction: direction || 'both'
+      });
+      
+      res.status(201).json(strategy);
+    } catch (error) {
+      console.error("Error creating strategy:", error);
+      res.status(500).json({ message: "Failed to create strategy" });
+    }
+  });
+  
+  // Update an existing strategy
+  app.put("/api/strategies/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({ message: "Strategy ID is required" });
+      }
+      
+      const updatedStrategy = await updateStrategy(DEFAULT_USER_ID, id, req.body);
+      res.json(updatedStrategy);
+    } catch (error) {
+      console.error("Error updating strategy:", error);
+      res.status(500).json({ message: "Failed to update strategy" });
+    }
+  });
+  
+  // Delete a strategy
+  app.delete("/api/strategies/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({ message: "Strategy ID is required" });
+      }
+      
+      const success = await deleteStrategy(DEFAULT_USER_ID, id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Strategy not found or delete failed" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting strategy:", error);
+      res.status(500).json({ message: "Failed to delete strategy" });
+    }
+  });
+  
+  // Run backtest on a strategy
+  app.post("/api/strategies/backtest", async (req: Request, res: Response) => {
+    try {
+      const {
+        strategy,
+        startDate,
+        endDate,
+        initialCapital,
+        slippage,
+        commission
+      } = req.body;
+      
+      if (!strategy) {
+        return res.status(400).json({ message: "Strategy is required" });
+      }
+      
+      // Parse dates if they are provided as strings
+      const parsedStartDate = startDate ? new Date(startDate) : undefined;
+      const parsedEndDate = endDate ? new Date(endDate) : undefined;
+      
+      const result = await runBacktest({
+        strategy,
+        startDate: parsedStartDate,
+        endDate: parsedEndDate,
+        initialCapital,
+        slippage,
+        commission
+      });
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "strategy_backtest",
+        details: {
+          strategyId: strategy.id,
+          strategyName: strategy.name,
+          startDate: parsedStartDate?.toISOString(),
+          endDate: parsedEndDate?.toISOString(),
+          totalTrades: result.totalTrades,
+          winRate: result.winRate,
+          netProfitPercent: result.netProfitPercent
+        }
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error running backtest:", error);
+      res.status(500).json({ message: "Failed to run backtest", error: String(error) });
+    }
+  });
+
   // --------------- ALERT SYSTEM API ENDPOINTS ---------------
   
   // Get alerts for current user
@@ -979,6 +1408,490 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   }
+  
+  // ==== Automated Trading API Endpoints ====
+  
+  // Get all trading signals for a symbol or set of symbols
+  app.get("/api/trading/signals", async (req: Request, res: Response) => {
+    try {
+      const userId = DEFAULT_USER_ID;
+      const symbol = req.query.symbol as string;
+      const signalType = req.query.type as string;
+      
+      if (!symbol) {
+        return res.status(400).json({ message: "Symbol is required" });
+      }
+      
+      const signals = [];
+      
+      // Get signals based on type
+      if (!signalType || signalType === 'technical') {
+        const technicalSignals = await tradingEngine.generateTechnicalSignals(symbol);
+        signals.push(...technicalSignals);
+      }
+      
+      if (!signalType || signalType === 'sentiment') {
+        const sentimentSignals = await tradingEngine.generateSentimentSignals(symbol);
+        signals.push(...sentimentSignals);
+      }
+      
+      if (!signalType || signalType === 'anomaly') {
+        const anomalySignals = await tradingEngine.generateAnomalySignals(symbol);
+        signals.push(...anomalySignals);
+      }
+      
+      if (!signalType || signalType === 'monte_carlo') {
+        const monteCarloSignals = await tradingEngine.generateMonteCarloSignals(symbol);
+        signals.push(...monteCarloSignals);
+      }
+      
+      // If we requested signals for multiple symbols, also check portfolio optimization
+      if (symbol.includes(',')) {
+        const symbols = symbol.split(',');
+        const portfolioSignals = await tradingEngine.generatePortfolioSignals(symbols);
+        signals.push(...portfolioSignals);
+      }
+      
+      // Get the combined signal
+      const combinedSignal = tradingEngine.combineSignals(signals);
+      
+      res.json({
+        signals,
+        combinedSignal,
+        count: signals.length
+      });
+    } catch (error) {
+      console.error('Error generating trading signals:', error);
+      res.status(500).json({ message: "Failed to generate trading signals" });
+    }
+  });
+  
+  // Execute a trade based on a signal
+  app.post("/api/trading/execute", async (req: Request, res: Response) => {
+    try {
+      const userId = DEFAULT_USER_ID;
+      const { symbol, direction, confidence, source, metadata } = req.body;
+      
+      if (!symbol || !direction || !confidence) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      
+      // Create a trading signal from the request
+      const signal: tradingEngine.TradingSignal = {
+        symbol,
+        direction: direction as 'long' | 'short',
+        confidence: parseFloat(confidence),
+        source: source as tradingEngine.SignalSource || 'technical',
+        metadata: metadata || {}
+      };
+      
+      // Process the signal, which will execute the trade if it passes all checks
+      const result = await tradingEngine.processSignal(userId, signal);
+      
+      if (result) {
+        res.json({ 
+          success: true,
+          message: `Successfully executed ${direction} trade for ${symbol}`,
+        });
+      } else {
+        res.json({ 
+          success: false,
+          message: "Signal rejected. Check risk parameters or existing positions.",
+        });
+      }
+    } catch (error) {
+      console.error('Error executing trade:', error);
+      res.status(500).json({ message: "Failed to execute trade" });
+    }
+  });
+  
+  // Get all active trading positions
+  app.get("/api/trading/positions", async (req: Request, res: Response) => {
+    try {
+      const userId = DEFAULT_USER_ID;
+      const status = req.query.status as string || 'open';
+      
+      const positions = await storage.getTradingPositions(userId, status);
+      
+      res.json(positions);
+    } catch (error) {
+      console.error('Error fetching trading positions:', error);
+      res.status(500).json({ message: "Failed to fetch trading positions" });
+    }
+  });
+  
+  // Update a trading position (e.g., close position)
+  app.put("/api/trading/positions/:id", async (req: Request, res: Response) => {
+    try {
+      const userId = DEFAULT_USER_ID;
+      const positionId = parseInt(req.params.id);
+      const { status, exitPrice, pnl } = req.body;
+      
+      if (!positionId) {
+        return res.status(400).json({ message: "Position ID is required" });
+      }
+      
+      // Update the position
+      const updatedPosition = await storage.updateTradingPosition(positionId, {
+        status: status || 'closed',
+        exitDate: new Date(),
+        exitPrice: exitPrice || null,
+        pnl: pnl || null
+      });
+      
+      // Log the position update
+      await storage.createEventLog({
+        userId,
+        eventType: "position_updated",
+        details: {
+          positionId,
+          status,
+          exitPrice,
+          pnl,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      res.json(updatedPosition);
+    } catch (error) {
+      console.error('Error updating trading position:', error);
+      res.status(500).json({ message: "Failed to update trading position" });
+    }
+  });
+  
+  // Get risk parameters
+  app.get("/api/trading/risk", async (req: Request, res: Response) => {
+    try {
+      // In a real system, these would be stored in the database per user
+      // For MVP, return the default risk parameters
+      res.json({
+        maxPositionSize: 10000,
+        maxDrawdown: 0.05,
+        maxOpenPositions: 5,
+        stopLossPercent: 0.02,
+        takeProfitPercent: 0.05
+      });
+    } catch (error) {
+      console.error('Error fetching risk parameters:', error);
+      res.status(500).json({ message: "Failed to fetch risk parameters" });
+    }
+  });
+  
+  // Update risk parameters
+  app.put("/api/trading/risk", async (req: Request, res: Response) => {
+    try {
+      const userId = DEFAULT_USER_ID;
+      const { maxPositionSize, maxDrawdown, maxOpenPositions, stopLossPercent, takeProfitPercent } = req.body;
+      
+      // In a real system, these would be stored in the database per user
+      // For MVP, just acknowledge the update
+      
+      // Log the risk parameter update
+      await storage.createEventLog({
+        userId,
+        eventType: "risk_parameters_updated",
+        details: {
+          maxPositionSize,
+          maxDrawdown,
+          maxOpenPositions,
+          stopLossPercent,
+          takeProfitPercent,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      res.json({ 
+        success: true,
+        message: "Risk parameters updated successfully", 
+        parameters: {
+          maxPositionSize: maxPositionSize || 10000,
+          maxDrawdown: maxDrawdown || 0.05,
+          maxOpenPositions: maxOpenPositions || 5,
+          stopLossPercent: stopLossPercent || 0.02,
+          takeProfitPercent: takeProfitPercent || 0.05
+        }
+      });
+    } catch (error) {
+      console.error('Error updating risk parameters:', error);
+      res.status(500).json({ message: "Failed to update risk parameters" });
+    }
+  });
+  
+  /*** Badge System API Endpoints ***/
+  
+  // Initialize badges (seed default badge definitions)
+  app.post("/api/badges/initialize", async (req: Request, res: Response) => {
+    try {
+      await seedBadgeDefinitions();
+      res.json({ success: true, message: "Badge definitions initialized successfully" });
+    } catch (error) {
+      console.error('Error initializing badges:', error);
+      res.status(500).json({ message: "Failed to initialize badge definitions" });
+    }
+  });
+  
+  // Get all badge definitions
+  app.get("/api/badges/definitions", async (req: Request, res: Response) => {
+    try {
+      const { category } = req.query;
+      const badges = await storage.getBadgeDefinitions(category as string | undefined);
+      res.json(badges);
+    } catch (error) {
+      console.error('Error getting badge definitions:', error);
+      res.status(500).json({ message: "Failed to get badge definitions" });
+    }
+  });
+  
+  // Get user badges
+  app.get("/api/user/badges", async (req: Request, res: Response) => {
+    try {
+      const userBadges = await badgeService.getUserBadges(DEFAULT_USER_ID);
+      
+      // Get badge details for each user badge
+      const detailedBadges = await Promise.all(
+        userBadges.map(async (userBadge) => {
+          const badgeDefinition = await storage.getBadgeDefinition(userBadge.badgeId);
+          return {
+            ...userBadge,
+            badgeDetails: badgeDefinition
+          };
+        })
+      );
+      
+      res.json(detailedBadges);
+    } catch (error) {
+      console.error('Error getting user badges:', error);
+      res.status(500).json({ message: "Failed to get user badges" });
+    }
+  });
+  
+  // Test route for simulating trade completion and badge awarding
+  app.post("/api/testing/simulate-trade", async (req: Request, res: Response) => {
+    try {
+      const userId = DEFAULT_USER_ID;
+      const { symbol, entryPrice, exitPrice, quantity, direction, pnl } = req.body;
+      
+      // Create a test trading position
+      const position = await storage.createTradingPosition({
+        userId,
+        symbol,
+        status: 'closed',
+        entryPrice,
+        exitPrice,
+        quantity,
+        direction,
+        pnl,
+        entryDate: new Date(),
+        exitDate: new Date(),
+        metadata: {}
+      });
+      
+      // Check if any badges should be awarded
+      const awardedBadges = await badgeService.checkPositionForBadges(userId, position);
+      
+      // Update goal progress
+      await goalService.updateGoalProgress(userId, position);
+      
+      res.json({ 
+        success: true, 
+        position,
+        awardedBadges,
+        message: `Trade simulated successfully. Awarded ${awardedBadges.length} badges.`
+      });
+    } catch (error) {
+      console.error("Error simulating trade:", error);
+      res.status(500).json({ message: "Failed to simulate trade", error: String(error) });
+    }
+  });
+  
+  // Mark a badge as seen
+  app.post("/api/user/badges/:id/seen", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const badgeId = parseInt(id);
+      
+      if (isNaN(badgeId)) {
+        return res.status(400).json({ message: "Invalid badge ID" });
+      }
+      
+      const updatedBadge = await badgeService.markBadgeAsSeen(badgeId);
+      res.json(updatedBadge);
+    } catch (error) {
+      console.error('Error marking badge as seen:', error);
+      res.status(500).json({ message: "Failed to mark badge as seen" });
+    }
+  });
+  
+  // Award a badge (for testing purposes)
+  app.post("/api/user/badges/award", async (req: Request, res: Response) => {
+    try {
+      const { badgeCode } = req.body;
+      
+      if (!badgeCode) {
+        return res.status(400).json({ message: "Badge code is required" });
+      }
+      
+      const newBadge = await badgeService.awardBadge(DEFAULT_USER_ID, badgeCode);
+      
+      if (!newBadge) {
+        return res.status(400).json({ message: `Failed to award badge ${badgeCode}` });
+      }
+      
+      res.json(newBadge);
+    } catch (error) {
+      console.error('Error awarding badge:', error);
+      res.status(500).json({ message: "Failed to award badge" });
+    }
+  });
+  
+  /*** Trading Goals API Endpoints ***/
+  
+  // Get user trading goals
+  app.get("/api/user/goals", async (req: Request, res: Response) => {
+    try {
+      const { completed } = req.query;
+      const isCompleted = completed === "true" ? true : 
+                        completed === "false" ? false : undefined;
+      
+      const goals = await goalService.getUserGoals(DEFAULT_USER_ID, isCompleted);
+      res.json(goals);
+    } catch (error) {
+      console.error('Error getting trading goals:', error);
+      res.status(500).json({ message: "Failed to get trading goals" });
+    }
+  });
+  
+  // Create a new trading goal
+  app.post("/api/user/goals", async (req: Request, res: Response) => {
+    try {
+      const goalData = req.body;
+      
+      // Validate goal data
+      const validatedGoal = insertTradingGoalSchema.parse({
+        ...goalData,
+        userId: DEFAULT_USER_ID,
+        isCompleted: false
+      });
+      
+      const newGoal = await goalService.createGoal(validatedGoal);
+      res.status(201).json(newGoal);
+    } catch (error) {
+      console.error('Error creating trading goal:', error);
+      res.status(500).json({ message: "Failed to create trading goal" });
+    }
+  });
+  
+  // Update a trading goal
+  app.patch("/api/user/goals/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const goalId = parseInt(id);
+      
+      if (isNaN(goalId)) {
+        return res.status(400).json({ message: "Invalid goal ID" });
+      }
+      
+      const goal = await goalService.getGoal(goalId);
+      
+      if (!goal) {
+        return res.status(404).json({ message: "Goal not found" });
+      }
+      
+      if (goal.userId !== DEFAULT_USER_ID) {
+        return res.status(403).json({ message: "Not authorized to update this goal" });
+      }
+      
+      const updatedGoal = await goalService.updateGoal(goalId, req.body);
+      res.json(updatedGoal);
+    } catch (error) {
+      console.error('Error updating trading goal:', error);
+      res.status(500).json({ message: "Failed to update trading goal" });
+    }
+  });
+  
+  // Complete a trading goal
+  app.post("/api/user/goals/:id/complete", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const goalId = parseInt(id);
+      
+      if (isNaN(goalId)) {
+        return res.status(400).json({ message: "Invalid goal ID" });
+      }
+      
+      const goal = await goalService.getGoal(goalId);
+      
+      if (!goal) {
+        return res.status(404).json({ message: "Goal not found" });
+      }
+      
+      if (goal.userId !== DEFAULT_USER_ID) {
+        return res.status(403).json({ message: "Not authorized to complete this goal" });
+      }
+      
+      if (goal.isCompleted) {
+        return res.status(400).json({ message: "Goal is already completed" });
+      }
+      
+      const completedGoal = await goalService.completeGoal(goalId);
+      res.json(completedGoal);
+    } catch (error) {
+      console.error('Error completing trading goal:', error);
+      res.status(500).json({ message: "Failed to complete trading goal" });
+    }
+  });
+  
+  // Create default goals for user
+  app.post("/api/user/goals/defaults", async (req: Request, res: Response) => {
+    try {
+      const defaultGoals = await goalService.createDefaultGoals(DEFAULT_USER_ID);
+      res.status(201).json(defaultGoals);
+    } catch (error) {
+      console.error('Error creating default goals:', error);
+      res.status(500).json({ message: "Failed to create default goals" });
+    }
+  });
+  
+  // Get event logs for user
+  app.get("/api/user/events", async (req: Request, res: Response) => {
+    try {
+      const { type, limit } = req.query;
+      const parsedLimit = limit ? parseInt(limit as string) : 20;
+      
+      let events;
+      
+      if (type === 'badge') {
+        events = await eventService.getBadgeEvents(DEFAULT_USER_ID, parsedLimit);
+      } else if (type === 'goal') {
+        events = await eventService.getGoalEvents(DEFAULT_USER_ID, parsedLimit);
+      } else if (type) {
+        events = await eventService.getEventLogsByType(DEFAULT_USER_ID, type as string, parsedLimit);
+      } else {
+        events = await eventService.getRecentEventLogs(DEFAULT_USER_ID, parsedLimit);
+      }
+      
+      res.json(events);
+    } catch (error) {
+      console.error('Error getting event logs:', error);
+      res.status(500).json({ message: "Failed to get event logs" });
+    }
+  });
+  
+  // Initialize database with seed data
+  app.post("/api/database/seed", async (req: Request, res: Response) => {
+    try {
+      // Seed badges
+      await seedBadgeDefinitions();
+      
+      // Create default goals for the user
+      await goalService.createDefaultGoals(DEFAULT_USER_ID);
+      
+      res.json({ success: true, message: "Database seeded successfully" });
+    } catch (error) {
+      console.error('Error seeding database:', error);
+      res.status(500).json({ message: "Failed to seed database" });
+    }
+  });
   
   return httpServer;
 }

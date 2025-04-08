@@ -4,6 +4,36 @@ import { BrokerConnection, InsertBrokerConnection } from "@shared/schema";
 // Supported brokers
 export type BrokerType = "zerodha" | "angelone" | "fyers" | "robinhood" | "binance";
 
+// Order types
+export type OrderType = "market" | "limit" | "stop" | "stop_limit";
+
+// Order direction
+export type OrderDirection = "long" | "short";
+
+// Order parameters
+export interface OrderParameters {
+  broker: string;
+  symbol: string;
+  quantity: number;
+  orderType: string;
+  direction: OrderDirection;
+  price?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  validity?: string;
+  metadata?: Record<string, any>;
+}
+
+// Order result
+export interface OrderResult {
+  success: boolean;
+  orderId?: string;
+  message?: string;
+  filledPrice?: number;
+  status?: string;
+  details?: Record<string, any>;
+}
+
 /**
  * Connect to the specified broker
  * @param userId The user ID
@@ -160,17 +190,22 @@ export async function disconnectBroker(userId: number, broker: BrokerType): Prom
 /**
  * Get data from connected broker
  * @param userId The user ID
- * @param dataType The type of data to retrieve (positions, orders, portfolio, watchlist)
+ * @param dataType The type of data to retrieve
+ * @param params Additional parameters for the request
  * @returns The requested broker data
  */
-export async function getBrokerData(userId: number, dataType: "positions" | "orders" | "portfolio" | "watchlist"): Promise<any[]> {
+export async function getBrokerData(
+  userId: number, 
+  dataType: "positions" | "orders" | "portfolio" | "watchlist" | "quote",
+  params?: Record<string, any>
+): Promise<any> {
   try {
     // Get active broker connections
     const connections = await storage.getBrokerConnections(userId);
     const activeConnections = connections.filter(conn => conn.isActive);
     
     if (activeConnections.length === 0) {
-      return [];
+      return dataType === "quote" ? null : [];
     }
     
     // In a real implementation, this would make API calls to the broker
@@ -279,6 +314,50 @@ export async function getBrokerData(userId: number, dataType: "positions" | "ord
           }
         ];
       
+      case "quote":
+        if (!params?.symbol) {
+          throw new Error("Symbol is required for quote data");
+        }
+        
+        // Mock quote data for different symbols
+        const quotes = {
+          "HDFCBANK": { price: 1642.30, change: 12.50, changePercent: 0.77, volume: 4500000 },
+          "INFY": { price: 1950.40, change: 23.80, changePercent: 1.24, volume: 2100000 },
+          "RELIANCE": { price: 2456.75, change: 28.90, changePercent: 1.19, volume: 3200000 },
+          "TCS": { price: 3568.50, change: -18.25, changePercent: -0.51, volume: 1200000 },
+          "ITC": { price: 423.30, change: 3.40, changePercent: 0.81, volume: 6500000 },
+          "AAPL": { price: 190.50, change: 2.30, changePercent: 1.22, volume: 55000000 },
+          "MSFT": { price: 338.15, change: 3.75, changePercent: 1.12, volume: 22000000 },
+          "GOOGL": { price: 130.25, change: 1.75, changePercent: 1.36, volume: 18000000 },
+          "AMZN": { price: 128.90, change: 2.15, changePercent: 1.70, volume: 35000000 },
+          "TSLA": { price: 245.20, change: 5.80, changePercent: 2.42, volume: 65000000 }
+        };
+        
+        const symbol = params.symbol.toUpperCase();
+        if (quotes[symbol]) {
+          return {
+            symbol,
+            price: quotes[symbol].price,
+            change: quotes[symbol].change,
+            changePercent: quotes[symbol].changePercent,
+            volume: quotes[symbol].volume,
+            broker: activeConnections[0].broker,
+            timestamp: new Date()
+          };
+        } else {
+          // Generate a random price for unknown symbols between 50 and 500
+          const randomPrice = 50 + Math.random() * 450;
+          return {
+            symbol,
+            price: parseFloat(randomPrice.toFixed(2)),
+            change: parseFloat((Math.random() * 10 - 5).toFixed(2)),
+            changePercent: parseFloat((Math.random() * 5 - 2.5).toFixed(2)),
+            volume: Math.floor(Math.random() * 10000000),
+            broker: activeConnections[0].broker,
+            timestamp: new Date()
+          };
+        }
+      
       default:
         return [];
     }
@@ -289,9 +368,88 @@ export async function getBrokerData(userId: number, dataType: "positions" | "ord
 }
 
 /**
- * Execute a trade order
- * Note: This is for future implementation, not included in MVP scope
+ * Place a broker order
+ * @param userId The user ID
+ * @param orderParams The order parameters
+ * @returns Result of the order placement
  */
-export async function executeTradeOrder(userId: number, order: any): Promise<any> {
-  throw new Error("Trade execution not implemented in MVP");
+export async function placeBrokerOrder(userId: number, orderParams: OrderParameters): Promise<OrderResult> {
+  try {
+    console.log(`Placing ${orderParams.direction} order for ${orderParams.symbol}, quantity: ${orderParams.quantity}`);
+    
+    // Get broker connection
+    const connection = await storage.getBrokerConnectionByBroker(userId, orderParams.broker);
+    
+    if (!connection || !connection.isActive) {
+      return {
+        success: false,
+        message: `No active connection found for broker: ${orderParams.broker}`
+      };
+    }
+    
+    // In a real implementation, this would make an API call to the broker
+    // to place the order. For the MVP, we'll simulate a successful order.
+    
+    // Generate a random order ID
+    const orderId = `ORD${Math.floor(Math.random() * 1000000)}`;
+    
+    // Get the current price for the symbol
+    const quoteData = await getBrokerData(userId, 'quote', { symbol: orderParams.symbol });
+    const currentPrice = orderParams.price || quoteData.price;
+    
+    // Randomly apply some slippage for market orders
+    const slippage = orderParams.orderType === 'market' ? (Math.random() * 0.01 - 0.005) : 0; // ±0.5% slippage
+    const filledPrice = parseFloat((currentPrice * (1 + slippage)).toFixed(2));
+    
+    // Log the order
+    await storage.createEventLog({
+      userId,
+      eventType: 'order_placed',
+      details: {
+        broker: orderParams.broker,
+        symbol: orderParams.symbol,
+        quantity: orderParams.quantity,
+        direction: orderParams.direction,
+        orderType: orderParams.orderType,
+        price: orderParams.price || 'market',
+        filledPrice,
+        stopLoss: orderParams.stopLoss,
+        takeProfit: orderParams.takeProfit,
+        timestamp: new Date().toISOString(),
+        orderId
+      }
+    });
+    
+    return {
+      success: true,
+      orderId,
+      filledPrice,
+      message: `Successfully placed ${orderParams.direction} order for ${orderParams.symbol}`,
+      status: 'filled',
+      details: {
+        symbol: orderParams.symbol,
+        quantity: orderParams.quantity,
+        direction: orderParams.direction,
+        orderType: orderParams.orderType,
+        time: new Date().toISOString()
+      }
+    };
+  } catch (error) {
+    console.error('Error placing broker order:', error);
+    
+    // Log the error
+    await storage.createEventLog({
+      userId,
+      eventType: 'order_error',
+      details: {
+        error: error.message,
+        orderParams
+      }
+    });
+    
+    return {
+      success: false,
+      message: `Failed to place order: ${error.message}`
+    };
+  }
 }

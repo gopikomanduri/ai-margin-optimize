@@ -11,13 +11,22 @@ import {
   InsertTradingPosition,
   EventLog,
   InsertEventLog,
+  BadgeDefinition,
+  InsertBadgeDefinition,
+  UserBadge,
+  InsertUserBadge,
+  TradingGoal,
+  InsertTradingGoal,
   // Table references for database queries
   users,
   chatMessages,
   contextMemory,
   brokerConnections,
   tradingPositions,
-  eventLogs
+  eventLogs,
+  badgeDefinitions,
+  userBadges,
+  tradingGoals
 } from "@shared/schema";
 import { db } from "./db";
 import { and, desc, eq } from "drizzle-orm";
@@ -51,6 +60,28 @@ export interface IStorage {
   // Event logs methods
   createEventLog(log: InsertEventLog): Promise<EventLog>;
   getEventLogs(userId: number, limit?: number): Promise<EventLog[]>;
+  
+  // Badge definition methods
+  getBadgeDefinitions(category?: string): Promise<BadgeDefinition[]>;
+  getBadgeDefinitionByCode(code: string): Promise<BadgeDefinition | undefined>;
+  getBadgeDefinition(id: number): Promise<BadgeDefinition | undefined>;
+  createBadgeDefinition(badge: InsertBadgeDefinition): Promise<BadgeDefinition>;
+  updateBadgeDefinition(id: number, badge: Partial<InsertBadgeDefinition>): Promise<BadgeDefinition>;
+  
+  // User badge methods
+  getUserBadges(userId: number): Promise<UserBadge[]>;
+  getUserBadge(id: number): Promise<UserBadge | undefined>;
+  getUserBadgeByBadgeId(userId: number, badgeId: number): Promise<UserBadge | undefined>;
+  createUserBadge(userBadge: InsertUserBadge): Promise<UserBadge>;
+  updateUserBadge(id: number, userBadge: Partial<InsertUserBadge>): Promise<UserBadge>;
+  markUserBadgeAsSeen(id: number): Promise<UserBadge>;
+  
+  // Trading goal methods
+  getTradingGoals(userId: number, isCompleted?: boolean): Promise<TradingGoal[]>;
+  getTradingGoal(id: number): Promise<TradingGoal | undefined>;
+  createTradingGoal(goal: InsertTradingGoal): Promise<TradingGoal>;
+  updateTradingGoal(id: number, goal: Partial<InsertTradingGoal>): Promise<TradingGoal>;
+  completeTradingGoal(id: number): Promise<TradingGoal>;
 }
 
 export class MemStorage implements IStorage {
@@ -60,6 +91,9 @@ export class MemStorage implements IStorage {
   private brokerConnections: Map<number, BrokerConnection>;
   private tradingPositions: Map<number, TradingPosition>;
   private eventLogs: Map<number, EventLog>;
+  private badgeDefinitions: Map<number, BadgeDefinition>;
+  private userBadges: Map<number, UserBadge>;
+  private tradingGoals: Map<number, TradingGoal>;
   
   private userIdCounter: number;
   private messageIdCounter: number;
@@ -67,6 +101,9 @@ export class MemStorage implements IStorage {
   private connectionIdCounter: number;
   private positionIdCounter: number;
   private logIdCounter: number;
+  private badgeDefinitionIdCounter: number;
+  private userBadgeIdCounter: number;
+  private tradingGoalIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -75,6 +112,9 @@ export class MemStorage implements IStorage {
     this.brokerConnections = new Map();
     this.tradingPositions = new Map();
     this.eventLogs = new Map();
+    this.badgeDefinitions = new Map();
+    this.userBadges = new Map();
+    this.tradingGoals = new Map();
     
     this.userIdCounter = 1;
     this.messageIdCounter = 1;
@@ -82,6 +122,9 @@ export class MemStorage implements IStorage {
     this.connectionIdCounter = 1;
     this.positionIdCounter = 1;
     this.logIdCounter = 1;
+    this.badgeDefinitionIdCounter = 1;
+    this.userBadgeIdCounter = 1;
+    this.tradingGoalIdCounter = 1;
     
     // Create a default user
     this.createUser({
@@ -249,6 +292,182 @@ export class MemStorage implements IStorage {
     
     return limit ? logs.slice(0, limit) : logs;
   }
+
+  // Badge definition methods
+  async getBadgeDefinitions(category?: string): Promise<BadgeDefinition[]> {
+    return Array.from(this.badgeDefinitions.values())
+      .filter(badge => badge.isActive && (!category || badge.category === category))
+      .sort((a, b) => a.level - b.level);
+  }
+
+  async getBadgeDefinitionByCode(code: string): Promise<BadgeDefinition | undefined> {
+    return Array.from(this.badgeDefinitions.values())
+      .find(badge => badge.code === code && badge.isActive);
+  }
+
+  async getBadgeDefinition(id: number): Promise<BadgeDefinition | undefined> {
+    return this.badgeDefinitions.get(id);
+  }
+
+  async createBadgeDefinition(badge: InsertBadgeDefinition): Promise<BadgeDefinition> {
+    const id = this.badgeDefinitionIdCounter++;
+    const now = new Date();
+    const badgeDefinition: BadgeDefinition = {
+      ...badge,
+      id,
+      createdAt: now,
+      updatedAt: now,
+      isActive: badge.isActive ?? true
+    };
+    this.badgeDefinitions.set(id, badgeDefinition);
+    return badgeDefinition;
+  }
+
+  async updateBadgeDefinition(id: number, badge: Partial<InsertBadgeDefinition>): Promise<BadgeDefinition> {
+    const existingBadge = this.badgeDefinitions.get(id);
+    if (!existingBadge) {
+      throw new Error(`Badge definition with id ${id} not found`);
+    }
+    
+    const updatedBadge: BadgeDefinition = {
+      ...existingBadge,
+      ...badge,
+      updatedAt: new Date()
+    };
+    
+    this.badgeDefinitions.set(id, updatedBadge);
+    return updatedBadge;
+  }
+
+  // User badge methods
+  async getUserBadges(userId: number): Promise<UserBadge[]> {
+    return Array.from(this.userBadges.values())
+      .filter(badge => badge.userId === userId)
+      .sort((a, b) => new Date(b.earnedAt).getTime() - new Date(a.earnedAt).getTime());
+  }
+
+  async getUserBadge(id: number): Promise<UserBadge | undefined> {
+    return this.userBadges.get(id);
+  }
+
+  async getUserBadgeByBadgeId(userId: number, badgeId: number): Promise<UserBadge | undefined> {
+    return Array.from(this.userBadges.values())
+      .find(badge => badge.userId === userId && badge.badgeId === badgeId);
+  }
+
+  async createUserBadge(userBadge: InsertUserBadge): Promise<UserBadge> {
+    const id = this.userBadgeIdCounter++;
+    const now = new Date();
+    const newUserBadge: UserBadge = {
+      ...userBadge,
+      id,
+      earnedAt: now,
+      firstEarnedAt: now,
+      isNew: true,
+      currentLevel: userBadge.currentLevel ?? 1
+    };
+    this.userBadges.set(id, newUserBadge);
+    return newUserBadge;
+  }
+
+  async updateUserBadge(id: number, userBadge: Partial<InsertUserBadge>): Promise<UserBadge> {
+    const existingBadge = this.userBadges.get(id);
+    if (!existingBadge) {
+      throw new Error(`User badge with id ${id} not found`);
+    }
+    
+    const updatedBadge: UserBadge = {
+      ...existingBadge,
+      ...userBadge,
+      earnedAt: new Date()
+    };
+    
+    this.userBadges.set(id, updatedBadge);
+    return updatedBadge;
+  }
+
+  async markUserBadgeAsSeen(id: number): Promise<UserBadge> {
+    const existingBadge = this.userBadges.get(id);
+    if (!existingBadge) {
+      throw new Error(`User badge with id ${id} not found`);
+    }
+    
+    const updatedBadge: UserBadge = {
+      ...existingBadge,
+      isNew: false
+    };
+    
+    this.userBadges.set(id, updatedBadge);
+    return updatedBadge;
+  }
+
+  // Trading goal methods
+  async getTradingGoals(userId: number, isCompleted?: boolean): Promise<TradingGoal[]> {
+    return Array.from(this.tradingGoals.values())
+      .filter(goal => 
+        goal.userId === userId && 
+        (isCompleted === undefined || goal.isCompleted === isCompleted)
+      )
+      .sort((a, b) => {
+        // Sort by completion status and creation date
+        if (a.isCompleted !== b.isCompleted) {
+          return a.isCompleted ? 1 : -1; // Active goals first
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+  }
+
+  async getTradingGoal(id: number): Promise<TradingGoal | undefined> {
+    return this.tradingGoals.get(id);
+  }
+
+  async createTradingGoal(goal: InsertTradingGoal): Promise<TradingGoal> {
+    const id = this.tradingGoalIdCounter++;
+    const now = new Date();
+    const tradingGoal: TradingGoal = {
+      ...goal,
+      id,
+      createdAt: now,
+      updatedAt: now,
+      isCompleted: false
+    };
+    this.tradingGoals.set(id, tradingGoal);
+    return tradingGoal;
+  }
+
+  async updateTradingGoal(id: number, goal: Partial<InsertTradingGoal>): Promise<TradingGoal> {
+    const existingGoal = this.tradingGoals.get(id);
+    if (!existingGoal) {
+      throw new Error(`Trading goal with id ${id} not found`);
+    }
+    
+    const updatedGoal: TradingGoal = {
+      ...existingGoal,
+      ...goal,
+      updatedAt: new Date()
+    };
+    
+    this.tradingGoals.set(id, updatedGoal);
+    return updatedGoal;
+  }
+
+  async completeTradingGoal(id: number): Promise<TradingGoal> {
+    const existingGoal = this.tradingGoals.get(id);
+    if (!existingGoal) {
+      throw new Error(`Trading goal with id ${id} not found`);
+    }
+    
+    const now = new Date();
+    const completedGoal: TradingGoal = {
+      ...existingGoal,
+      isCompleted: true,
+      completedAt: now,
+      updatedAt: now
+    };
+    
+    this.tradingGoals.set(id, completedGoal);
+    return completedGoal;
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -410,6 +629,207 @@ export class DatabaseStorage implements IStorage {
     }
     
     return await query;
+  }
+
+  // Badge definition methods
+  async getBadgeDefinitions(category?: string): Promise<BadgeDefinition[]> {
+    let query = db.select().from(badgeDefinitions)
+      .where(eq(badgeDefinitions.isActive, true));
+      
+    if (category) {
+      query = query.where(eq(badgeDefinitions.category, category));
+    }
+    
+    return await query.orderBy(badgeDefinitions.level);
+  }
+  
+  async getBadgeDefinitionByCode(code: string): Promise<BadgeDefinition | undefined> {
+    const [badge] = await db.select()
+      .from(badgeDefinitions)
+      .where(and(
+        eq(badgeDefinitions.code, code),
+        eq(badgeDefinitions.isActive, true)
+      ));
+      
+    return badge || undefined;
+  }
+  
+  async getBadgeDefinition(id: number): Promise<BadgeDefinition | undefined> {
+    const [badge] = await db.select()
+      .from(badgeDefinitions)
+      .where(eq(badgeDefinitions.id, id));
+      
+    return badge || undefined;
+  }
+  
+  async createBadgeDefinition(badge: InsertBadgeDefinition): Promise<BadgeDefinition> {
+    const now = new Date();
+    const [badgeDefinition] = await db.insert(badgeDefinitions)
+      .values({
+        ...badge,
+        createdAt: now,
+        updatedAt: now,
+        isActive: badge.isActive ?? true
+      })
+      .returning();
+      
+    return badgeDefinition;
+  }
+  
+  async updateBadgeDefinition(id: number, badge: Partial<InsertBadgeDefinition>): Promise<BadgeDefinition> {
+    const [updatedBadge] = await db.update(badgeDefinitions)
+      .set({
+        ...badge,
+        updatedAt: new Date()
+      })
+      .where(eq(badgeDefinitions.id, id))
+      .returning();
+      
+    return updatedBadge;
+  }
+  
+  // User badge methods
+  async getUserBadges(userId: number): Promise<UserBadge[]> {
+    return await db.select()
+      .from(userBadges)
+      .where(eq(userBadges.userId, userId))
+      .orderBy(desc(userBadges.earnedAt));
+  }
+  
+  async getUserBadge(id: number): Promise<UserBadge | undefined> {
+    const [badge] = await db.select()
+      .from(userBadges)
+      .where(eq(userBadges.id, id));
+      
+    return badge || undefined;
+  }
+  
+  async getUserBadgeByBadgeId(userId: number, badgeId: number): Promise<UserBadge | undefined> {
+    const [badge] = await db.select()
+      .from(userBadges)
+      .where(and(
+        eq(userBadges.userId, userId),
+        eq(userBadges.badgeId, badgeId)
+      ));
+      
+    return badge || undefined;
+  }
+  
+  async createUserBadge(userBadge: InsertUserBadge): Promise<UserBadge> {
+    const now = new Date();
+    const [badge] = await db.insert(userBadges)
+      .values({
+        ...userBadge,
+        earnedAt: now,
+        firstEarnedAt: now,
+        isNew: true,
+        currentLevel: userBadge.currentLevel ?? 1
+      })
+      .returning();
+      
+    return badge;
+  }
+  
+  async updateUserBadge(id: number, userBadge: Partial<InsertUserBadge>): Promise<UserBadge> {
+    const [updatedBadge] = await db.update(userBadges)
+      .set({
+        ...userBadge,
+        earnedAt: new Date()
+      })
+      .where(eq(userBadges.id, id))
+      .returning();
+      
+    return updatedBadge;
+  }
+  
+  async markUserBadgeAsSeen(id: number): Promise<UserBadge> {
+    const [updatedBadge] = await db.update(userBadges)
+      .set({ isNew: false })
+      .where(eq(userBadges.id, id))
+      .returning();
+      
+    return updatedBadge;
+  }
+  
+  // Trading goal methods
+  async getTradingGoals(userId: number, isCompleted?: boolean): Promise<TradingGoal[]> {
+    try {
+      let result;
+      
+      if (isCompleted !== undefined) {
+        result = await db.select().from(tradingGoals)
+          .where(
+            and(
+              eq(tradingGoals.userId, userId),
+              eq(tradingGoals.isCompleted, isCompleted)
+            )
+          );
+      } else {
+        result = await db.select().from(tradingGoals)
+          .where(eq(tradingGoals.userId, userId));
+      }
+      
+      // Sort the results in memory
+      return result.sort((a, b) => {
+        // First by completion status
+        if (a.isCompleted !== b.isCompleted) {
+          return a.isCompleted ? 1 : -1;
+        }
+        // Then by created date (newest first)
+        return new Date(b.createdAt || new Date()).getTime() - new Date(a.createdAt || new Date()).getTime();
+      });
+    } catch (error) {
+      console.error('Error in getTradingGoals:', error);
+      return [];
+    }
+  }
+  
+  async getTradingGoal(id: number): Promise<TradingGoal | undefined> {
+    const [goal] = await db.select()
+      .from(tradingGoals)
+      .where(eq(tradingGoals.id, id));
+      
+    return goal || undefined;
+  }
+  
+  async createTradingGoal(goal: InsertTradingGoal): Promise<TradingGoal> {
+    const now = new Date();
+    const [tradingGoal] = await db.insert(tradingGoals)
+      .values({
+        ...goal,
+        createdAt: now,
+        updatedAt: now,
+        isCompleted: false
+      })
+      .returning();
+      
+    return tradingGoal;
+  }
+  
+  async updateTradingGoal(id: number, goal: Partial<InsertTradingGoal>): Promise<TradingGoal> {
+    const [updatedGoal] = await db.update(tradingGoals)
+      .set({
+        ...goal,
+        updatedAt: new Date()
+      })
+      .where(eq(tradingGoals.id, id))
+      .returning();
+      
+    return updatedGoal;
+  }
+  
+  async completeTradingGoal(id: number): Promise<TradingGoal> {
+    const now = new Date();
+    const [completedGoal] = await db.update(tradingGoals)
+      .set({
+        isCompleted: true,
+        completedAt: now,
+        updatedAt: now
+      })
+      .where(eq(tradingGoals.id, id))
+      .returning();
+      
+    return completedGoal;
   }
 }
 
