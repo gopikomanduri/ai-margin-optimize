@@ -11,7 +11,16 @@ import {
   InsertTradingPosition,
   EventLog,
   InsertEventLog,
+  // Table references for database queries
+  users,
+  chatMessages,
+  contextMemory,
+  brokerConnections,
+  tradingPositions,
+  eventLogs
 } from "@shared/schema";
+import { db } from "./db";
+import { and, desc, eq } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -242,4 +251,167 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async getChatMessages(userId: number, limit?: number): Promise<ChatMessage[]> {
+    const query = db.select()
+      .from(chatMessages)
+      .where(eq(chatMessages.userId, userId))
+      .orderBy(desc(chatMessages.createdAt));
+    
+    if (limit) {
+      query.limit(limit);
+    }
+
+    return await query;
+  }
+
+  async createChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const [chatMessage] = await db.insert(chatMessages).values(message).returning();
+    return chatMessage;
+  }
+
+  async clearChatMessages(userId: number): Promise<void> {
+    await db.delete(chatMessages).where(eq(chatMessages.userId, userId));
+  }
+
+  async getContextMemory(userId: number): Promise<ContextMemory | undefined> {
+    const [memory] = await db.select()
+      .from(contextMemory)
+      .where(eq(contextMemory.userId, userId));
+    
+    return memory || undefined;
+  }
+
+  async createOrUpdateContextMemory(memory: InsertContextMemory): Promise<ContextMemory> {
+    // Check if a memory already exists for this user
+    const existingMemory = await this.getContextMemory(memory.userId);
+    
+    if (existingMemory) {
+      // Update existing memory
+      const [updatedMemory] = await db.update(contextMemory)
+        .set({
+          data: memory.data,
+          lastUpdated: new Date()
+        })
+        .where(eq(contextMemory.id, existingMemory.id))
+        .returning();
+        
+      return updatedMemory;
+    } else {
+      // Create new memory
+      const [newMemory] = await db.insert(contextMemory)
+        .values({
+          ...memory,
+          lastUpdated: new Date()
+        })
+        .returning();
+        
+      return newMemory;
+    }
+  }
+
+  async getBrokerConnections(userId: number): Promise<BrokerConnection[]> {
+    return await db.select()
+      .from(brokerConnections)
+      .where(eq(brokerConnections.userId, userId));
+  }
+
+  async getBrokerConnectionByBroker(userId: number, broker: string): Promise<BrokerConnection | undefined> {
+    const [connection] = await db.select()
+      .from(brokerConnections)
+      .where(and(
+        eq(brokerConnections.userId, userId),
+        eq(brokerConnections.broker, broker)
+      ));
+      
+    return connection || undefined;
+  }
+
+  async createBrokerConnection(connection: InsertBrokerConnection): Promise<BrokerConnection> {
+    const [brokerConnection] = await db.insert(brokerConnections)
+      .values(connection)
+      .returning();
+      
+    return brokerConnection;
+  }
+
+  async updateBrokerConnection(id: number, partialConnection: Partial<InsertBrokerConnection>): Promise<BrokerConnection> {
+    const [updatedConnection] = await db.update(brokerConnections)
+      .set(partialConnection)
+      .where(eq(brokerConnections.id, id))
+      .returning();
+      
+    return updatedConnection;
+  }
+
+  async getTradingPositions(userId: number, status?: string): Promise<TradingPosition[]> {
+    let query = db.select()
+      .from(tradingPositions)
+      .where(eq(tradingPositions.userId, userId));
+      
+    if (status) {
+      query = query.where(eq(tradingPositions.status, status));
+    }
+    
+    return await query;
+  }
+
+  async createTradingPosition(position: InsertTradingPosition): Promise<TradingPosition> {
+    const [tradingPosition] = await db.insert(tradingPositions)
+      .values(position)
+      .returning();
+      
+    return tradingPosition;
+  }
+
+  async updateTradingPosition(id: number, partialPosition: Partial<InsertTradingPosition>): Promise<TradingPosition> {
+    const [updatedPosition] = await db.update(tradingPositions)
+      .set(partialPosition)
+      .where(eq(tradingPositions.id, id))
+      .returning();
+      
+    return updatedPosition;
+  }
+
+  async createEventLog(log: InsertEventLog): Promise<EventLog> {
+    const [eventLog] = await db.insert(eventLogs)
+      .values({
+        ...log,
+        createdAt: new Date()
+      })
+      .returning();
+      
+    return eventLog;
+  }
+
+  async getEventLogs(userId: number, limit?: number): Promise<EventLog[]> {
+    let query = db.select()
+      .from(eventLogs)
+      .where(eq(eventLogs.userId, userId))
+      .orderBy(desc(eventLogs.createdAt));
+      
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    return await query;
+  }
+}
+
+// Use the DatabaseStorage instead of MemStorage
+export const storage = new DatabaseStorage();

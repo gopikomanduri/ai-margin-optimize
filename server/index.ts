@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+// Import database connection to ensure it's initialized
+import './db';
 
 const app = express();
 app.use(express.json());
@@ -37,6 +39,15 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Seed the database with initial data
+  try {
+    const seedModule = await import('./seed'); 
+    await seedModule.default();
+    log('Database seeded successfully');
+  } catch (error) {
+    log('Error seeding database: ' + error);
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
