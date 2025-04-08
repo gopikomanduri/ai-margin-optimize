@@ -10,6 +10,10 @@ import { getMarketData } from "./services/marketData";
 import { getAnthropicCompletion } from "./services/anthropic";
 import { connectBroker, getBrokerData } from "./services/broker";
 import { saveToMemory, retrieveFromMemory } from "./services/mcp";
+// New AI and Mathematical Models
+import { optimizePortfolio } from "./services/portfolioOptimization";
+import { runMonteCarloSimulation, simulateStrategy } from "./services/monteCarloSimulation";
+import { detectAnomalies } from "./services/anomalyDetection";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Default user ID (for demo purposes)
@@ -319,6 +323,303 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ explanation: aiResponse.content });
     } catch (error) {
       res.status(500).json({ message: "Failed to explain concept" });
+    }
+  });
+
+  /*** Advanced AI and Mathematical Models API Endpoints ***/
+
+  // Portfolio Optimization
+  app.post("/api/portfolio/optimize", async (req: Request, res: Response) => {
+    try {
+      const {
+        riskTolerance = "moderate",
+        investmentHorizon = "medium",
+        assets = ["HDFCBANK", "INFY", "RELIANCE", "TCS", "ICICIBANK"],
+        constraints
+      } = req.body;
+
+      if (!assets || !Array.isArray(assets) || assets.length === 0) {
+        return res.status(400).json({ message: "Assets array is required" });
+      }
+
+      const result = await optimizePortfolio({
+        riskTolerance: riskTolerance as 'conservative' | 'moderate' | 'aggressive',
+        investmentHorizon: investmentHorizon as 'short' | 'medium' | 'long',
+        assets,
+        constraints
+      });
+
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "portfolio_optimization",
+        details: {
+          requestParams: { riskTolerance, investmentHorizon, assetsCount: assets.length },
+          resultSummary: {
+            expectedReturn: result.expectedReturn,
+            expectedVolatility: result.expectedVolatility,
+            sharpeRatio: result.sharpeRatio
+          }
+        }
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to optimize portfolio" });
+    }
+  });
+
+  // Monte Carlo Simulation
+  app.post("/api/simulation/monte-carlo", async (req: Request, res: Response) => {
+    try {
+      const {
+        initialInvestment,
+        timeHorizonDays,
+        numSimulations = 1000,
+        assets,
+        confidenceInterval = 0.95,
+        drawdownThreshold = 0.2
+      } = req.body;
+
+      if (!initialInvestment || !timeHorizonDays || !assets) {
+        return res.status(400).json({ 
+          message: "Initial investment, time horizon, and assets are required" 
+        });
+      }
+
+      const result = runMonteCarloSimulation({
+        initialInvestment,
+        timeHorizonDays,
+        numSimulations,
+        assets,
+        confidenceInterval,
+        drawdownThreshold
+      });
+
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "monte_carlo_simulation",
+        details: {
+          requestParams: { 
+            initialInvestment, 
+            timeHorizonDays, 
+            numSimulations, 
+            assetsCount: assets.length 
+          },
+          resultSummary: {
+            expectedValue: result.expectedValue,
+            successProbability: result.successProbability,
+            maxDrawdown: result.drawdownStats.max
+          }
+        }
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to run Monte Carlo simulation" });
+    }
+  });
+
+  // Trading Strategy Simulation
+  app.post("/api/simulation/strategy", async (req: Request, res: Response) => {
+    try {
+      const {
+        initialCapital,
+        winRate,
+        avgWin,
+        avgLoss,
+        tradesPerYear,
+        years,
+        numSimulations = 1000
+      } = req.body;
+
+      if (!initialCapital || winRate === undefined || !avgWin || !avgLoss || !tradesPerYear || !years) {
+        return res.status(400).json({ 
+          message: "All strategy parameters are required" 
+        });
+      }
+
+      const result = simulateStrategy({
+        initialCapital,
+        winRate,
+        avgWin,
+        avgLoss,
+        tradesPerYear,
+        years,
+        numSimulations
+      });
+
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "strategy_simulation",
+        details: {
+          requestParams: { initialCapital, winRate, avgWin, avgLoss, tradesPerYear, years },
+          resultSummary: {
+            meanFinalCapital: result.finalCapital.mean,
+            profitProbability: result.profitProbability,
+            meanCAGR: result.cagr.mean
+          }
+        }
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to simulate trading strategy" });
+    }
+  });
+
+  // Anomaly Detection
+  app.post("/api/market/anomalies", async (req: Request, res: Response) => {
+    try {
+      const {
+        symbol,
+        lookbackPeriod = 60,
+        sensitivityLevel = "medium",
+        includeVolume = true,
+        includeGaps = true,
+        includeVolatility = true,
+        includeCorrelation = false,
+        correlatedSymbols = []
+      } = req.body;
+
+      if (!symbol) {
+        return res.status(400).json({ message: "Symbol is required" });
+      }
+
+      const result = await detectAnomalies({
+        symbol,
+        lookbackPeriod,
+        sensitivityLevel: sensitivityLevel as 'low' | 'medium' | 'high',
+        includeVolume,
+        includeGaps,
+        includeVolatility,
+        includeCorrelation,
+        correlatedSymbols
+      });
+
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "anomaly_detection",
+        details: {
+          symbol,
+          anomalyCount: result.anomalies.length,
+          tradingOpportunities: result.tradingOpportunities.length
+        }
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to detect market anomalies" });
+    }
+  });
+
+  // Risk Analysis for a Position
+  app.post("/api/risk/analyze", async (req: Request, res: Response) => {
+    try {
+      const {
+        symbol,
+        entryPrice,
+        quantity,
+        stopLoss,
+        takeProfit,
+        positionType = "long"
+      } = req.body;
+
+      if (!symbol || !entryPrice || !quantity) {
+        return res.status(400).json({ message: "Symbol, entry price, and quantity are required" });
+      }
+
+      // Get technical analysis data for volatility
+      const technicalData = await getTechnicalAnalysis(symbol);
+      
+      // Run a mini Monte Carlo simulation for the position
+      const positionSize = entryPrice * quantity;
+      const volatility = technicalData.atr ? technicalData.atr.current / entryPrice : 0.02;
+      const daysToTarget = 30; // Default to a month
+      
+      // Calculate risk parameters
+      const stopLossPercent = stopLoss ? (Math.abs(entryPrice - stopLoss) / entryPrice) * (positionType === "long" ? -1 : 1) : -0.05;
+      const takeProfitPercent = takeProfit ? (Math.abs(takeProfit - entryPrice) / entryPrice) * (positionType === "long" ? 1 : -1) : 0.1;
+      
+      // Run simplified simulation
+      const result = runMonteCarloSimulation({
+        initialInvestment: positionSize,
+        timeHorizonDays: daysToTarget,
+        numSimulations: 500,
+        assets: [{
+          symbol,
+          weight: 1,
+          expectedAnnualReturn: positionType === "long" ? 0.15 : -0.15,
+          annualVolatility: volatility * Math.sqrt(252)
+        }],
+        confidenceInterval: 0.95,
+        drawdownThreshold: Math.abs(stopLossPercent)
+      });
+      
+      // Calculate risk metrics
+      const riskRewardRatio = Math.abs(takeProfitPercent / stopLossPercent);
+      const probProfitable = result.successProbability;
+      const expectedValue = result.expectedValue - positionSize;
+      const expectedValuePercent = expectedValue / positionSize;
+      const maxLoss = positionSize - result.percentiles["1%"];
+      const maxLossPercent = maxLoss / positionSize;
+      
+      // Kelly criterion calculation
+      const winProbability = probProfitable;
+      const lossProbability = 1 - winProbability;
+      const kellyPercentage = Math.max(0, winProbability - (lossProbability / riskRewardRatio));
+      const kellyPositionSize = kellyPercentage * positionSize;
+      
+      const riskAnalysis = {
+        symbol,
+        positionType,
+        positionSize,
+        riskMetrics: {
+          stopLossPercent,
+          takeProfitPercent,
+          riskRewardRatio,
+          probProfitable,
+          expectedValue,
+          expectedValuePercent,
+          maxLossPercent,
+          valueAtRisk: {
+            "95%": positionSize - result.percentiles["5%"],
+            "99%": positionSize - result.percentiles["1%"]
+          },
+          kellyPercentage,
+          kellyPositionSize,
+        },
+        simulationResults: {
+          expectedValue: result.expectedValue,
+          percentiles: result.percentiles,
+          successProbability: result.successProbability,
+          drawdownProbability: result.drawdownStats.exceedanceProbability,
+        },
+        recommendations: [
+          kellyPercentage < 0.1 ? "Position has unfavorable risk-reward characteristics" : 
+            "Position has favorable risk-reward characteristics",
+          riskRewardRatio < 1 ? "Consider adjusting stop loss or take profit to improve risk-reward ratio" : 
+            `Risk-reward ratio of ${riskRewardRatio.toFixed(2)} is acceptable`,
+          probProfitable < 0.4 ? "Low probability of profit, consider alternative trade setup" : 
+            probProfitable > 0.6 ? "High probability of profit" : "Moderate probability of profit",
+          expectedValuePercent < 0 ? "Negative expected value, consider avoiding this trade" :
+            "Positive expected value trade"
+        ]
+      };
+      
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "risk_analysis",
+        details: {
+          symbol,
+          positionSize,
+          riskRewardRatio,
+          expectedValuePercent
+        }
+      });
+      
+      res.json(riskAnalysis);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to analyze risk" });
     }
   });
 
