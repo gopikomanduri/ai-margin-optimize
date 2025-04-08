@@ -1,0 +1,204 @@
+Business Requirements Document (BRD)
+
+Product Name: TradeMind
+Tagline: Your AI-Powered Trading Co-Pilot With Memory
+
+💡 Executive Summary:
+
+TradeMind is an AI-native trading assistant that leverages the Model Context Protocol (MCP) to deliver persistent, personalized, and intelligent trade recommendations to retail and institutional users. It simplifies trading through an intuitive, conversational interface and augments decisions using memory, real-time data, technical analysis, sentiment, and fundamental signals.
+
+💼 Business Goals:
+
+Democratize intelligent trading tools for non-experts and pros.
+
+Provide real-time trade suggestions tailored to user style.
+
+Enable persistent trading memory and personalized feedback loop.
+
+Aggregate sentiment, technical, and corporate data into insights.
+
+Position as a plug-and-play trading assistant for brokers/fintechs.
+
+🌐 Target Audience:
+
+Retail traders using Indian and global brokerages.
+
+Junior analysts and wealth managers.
+
+Trading educators and financial communities.
+
+Fintech companies seeking AI augmentation.
+
+💮 Success Metrics:
+
+Time to first trade suggestion.
+
+Number of returning users using personalized suggestions.
+
+Accuracy of recommendations (measured via PnL attribution).
+
+Sentiment-to-trade correlation success rate.
+
+User NPS based on clarity, simplicity, and trust.
+
+🛠️ Product Requirements Document (PRD)
+
+1. Core Features
+
+1.1 Chat-Based Trading Assistant
+
+Conversational agent for:
+
+"Find me a low-risk trade."
+
+"Summarize my trading activity."
+
+"What’s the outlook for NIFTY today?"
+
+Supports beginner and pro language modes.
+
+1.2 Persistent Context (via MCP)
+
+Remembers user preferences, risk appetite, past trades, feedback.
+
+Retrieves relevant historical strategies to match current market.
+
+1.3 Broker Integration
+
+Login + sync positions and trades from:
+
+AngelOne
+
+Fyers
+
+Zerodha
+
+Robinhood
+
+Binance
+
+1.4 Smart Trade Suggestions
+
+Context-aware recommendations based on:
+
+User strategy
+
+Risk level
+
+Historical outcomes
+
+Sentiment + technical signals
+
+1.5 Sentiment Analysis
+
+Scrape & analyze Twitter/X, Reddit, financial news.
+
+Score and visualize sentiment on selected stocks/indexes.
+
+1.6 Technical Analysis Engine
+
+Run top 5 indicators (EMA, MACD, RSI, ADX, OBV) only on instruments of interest.
+
+Show actionable signal summaries in the UI.
+
+1.7 Fundamental & Corporate Action Scanner
+
+Show quarterly earnings summary, dividends, splits, board news.
+
+Show company-specific or index-wide corporate events.
+
+1.8 Index Impact Engine
+
+For indexes (e.g., NIFTY), analyze underlying stock events.
+
+Use rule-based scoring to determine index impact probability.
+
+2. Technical Design
+
+Frontend (Replit):
+
+Chat interface (React or HTML/CSS/JS)
+
+Dashboard panels for sentiment, TA, news, and performance
+
+Backend (Replit or cloud):
+
+FastAPI or Flask (Python)
+
+OpenAI GPT-4 API for agent brain
+
+MCP server (self-hosted or integrated)
+
+Redis/Postgres for persistent memory
+
+TA-Lib or Pandas TA for indicator calculations
+
+Market & news scraping services
+
+Earnings/corporate action APIs
+
+Integrations:
+
+OpenAI
+
+MCP
+
+Broker APIs (Zerodha, Fyers, AngelOne, Robinhood, Binance)
+
+Market data and sentiment feeds
+
+Earnings + corporate news APIs
+
+3. User Experience Flows
+
+Login -> Broker Auth -> Trade History Sync
+
+Agent greets user with personalized context
+
+Suggestions & alerts shown in chat UI
+
+Users can toggle Beginner/Pro language
+
+Visualizations for TA/sentiment/news shown contextually
+
+4. Non-Functional Requirements
+
+Secure API key storage (.env)
+
+Daily autosave of context/memory
+
+Logs of suggestions and outcomes
+
+Mocked services fallback mode
+
+5. MVP Scope
+
+✅ Included:
+
+Chat interface (basic)
+
+MCP context memory
+
+Broker login (read-only)
+
+Trade ideas + explanation
+
+Sentiment widget
+
+TA for selected stocks
+
+Fundamental data scan
+
+Index impact scoring
+
+🚧 Future Enhancements:
+
+Voice interface
+
+Auto trade execution
+
+Strategy builder and backtester
+
+Real-time triggers & alerts
+
+ML-based index sensitivity modeling
