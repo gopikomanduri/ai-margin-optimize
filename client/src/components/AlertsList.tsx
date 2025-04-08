@@ -42,7 +42,18 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from '@/hooks/use-toast';
-import { AlertTriangle, Bell, Edit, Trash } from 'lucide-react';
+import { 
+  AlertTriangle, 
+  Bell, 
+  Edit, 
+  Trash, 
+  ArrowUpCircle, 
+  ArrowDownCircle,
+  BarChart3, 
+  Volume2,
+  Newspaper,
+  Plus
+} from 'lucide-react';
 
 // Define types for Alert
 interface Alert {
@@ -112,30 +123,37 @@ export function AlertsList({ symbol }: AlertsListProps) {
     },
   });
 
-  // Render alert type with appropriate styling
+  // Render alert type with appropriate styling and icon
   const renderAlertType = (type: string) => {
     let color = '';
+    let Icon;
     
     switch (type) {
       case 'price':
         color = 'bg-blue-100 text-blue-800';
+        Icon = type === 'price' ? ArrowUpCircle : ArrowDownCircle;
         break;
       case 'technical':
         color = 'bg-purple-100 text-purple-800';
+        Icon = BarChart3;
         break;
       case 'volume':
         color = 'bg-green-100 text-green-800';
+        Icon = Volume2;
         break;
       case 'news':
         color = 'bg-yellow-100 text-yellow-800';
+        Icon = Newspaper;
         break;
       default:
         color = 'bg-gray-100 text-gray-800';
+        Icon = Bell;
     }
     
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>
-        {type}
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${color} flex items-center gap-1`}>
+        <Icon className="h-3 w-3" />
+        <span>{type}</span>
       </span>
     );
   };
@@ -227,14 +245,23 @@ export function AlertsList({ symbol }: AlertsListProps) {
           </Table>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center p-8 border rounded-md bg-gray-50">
-          <Bell className="h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium">No alerts found</h3>
-          <p className="text-sm text-gray-500 mb-4">
-            Create your first alert to get notifications about market conditions.
+        <div className="flex flex-col items-center justify-center p-12 border rounded-md bg-gray-50">
+          <div className="relative mb-8">
+            <Bell className="h-16 w-16 text-gray-300" />
+            <div className="absolute top-0 right-0 w-6 h-6 rounded-full bg-primary flex items-center justify-center animate-pulse">
+              <Plus className="h-4 w-4 text-white" />
+            </div>
+          </div>
+          <h3 className="text-xl font-medium text-gray-800 mb-2">No alerts configured</h3>
+          <p className="text-sm text-gray-500 mb-6 text-center max-w-md">
+            Create your first price alert to get notified when stocks hit your target price or technical indicators reach specific thresholds.
           </p>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            Create Alert
+          <Button 
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="px-6 py-2 rounded-full shadow-md hover:shadow-lg transition-all"
+          >
+            <Bell className="h-4 w-4 mr-2" />
+            Create New Alert
           </Button>
         </div>
       )}

@@ -544,7 +544,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Run a mini Monte Carlo simulation for the position
       const positionSize = entryPrice * quantity;
-      const volatility = technicalData.atr ? technicalData.atr.current / entryPrice : 0.02;
+      // Extract volatility or use fallback value
+      const volatility = 0.02; // Default volatility of 2%
       const daysToTarget = 30; // Default to a month
       
       // Calculate risk parameters

@@ -6,7 +6,14 @@ import {
   Check,
   ChevronDown,
   X,
-  AlertCircle
+  AlertCircle,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  BarChart3,
+  Volume2,
+  Newspaper,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import {
   Popover,
@@ -206,12 +213,14 @@ export function AlertNotifications() {
           <h3 className="font-medium">Notifications</h3>
           <div className="flex items-center gap-2">
             {wsConnected ? (
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                Connected
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 flex items-center gap-1">
+                <Wifi className="h-3 w-3" />
+                <span>Connected</span>
               </Badge>
             ) : (
-              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                Disconnected
+              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 flex items-center gap-1">
+                <WifiOff className="h-3 w-3" />
+                <span>Disconnected</span>
               </Badge>
             )}
             <Button variant="ghost" size="sm" onClick={markAllAsRead} disabled={unreadCount === 0}>
@@ -246,20 +255,39 @@ export function AlertNotifications() {
                 return (
                   <div 
                     key={notification.id}
-                    className={`p-4 border-b ${isRead ? 'bg-white' : 'bg-blue-50'}`}
+                    className={`p-4 border-b hover:bg-gray-50 transition-colors cursor-pointer ${isRead ? 'bg-white' : 'bg-blue-50'}`}
                     onClick={() => markAsRead(notification.id)}
                   >
                     <div className="flex justify-between mb-1">
-                      <div className="font-medium">{notification.symbol}</div>
-                      <div className="text-xs text-gray-500">
-                        {formatDate(notification.triggeredAt)}
+                      <div className="font-medium flex items-center gap-1">
+                        {notification.symbol.includes("up") || notification.message.includes("above") ? (
+                          <ArrowUpCircle className="h-4 w-4 text-green-500" />
+                        ) : notification.symbol.includes("down") || notification.message.includes("below") ? (
+                          <ArrowDownCircle className="h-4 w-4 text-red-500" />
+                        ) : notification.message.includes("technical") ? (
+                          <BarChart3 className="h-4 w-4 text-purple-500" />
+                        ) : notification.message.includes("volume") ? (
+                          <Volume2 className="h-4 w-4 text-blue-500" />
+                        ) : notification.message.includes("news") ? (
+                          <Newspaper className="h-4 w-4 text-yellow-500" />
+                        ) : (
+                          <Bell className="h-4 w-4 text-gray-500" />
+                        )}
+                        <span>{notification.symbol}</span>
+                      </div>
+                      <div className="text-xs text-gray-500 flex items-center">
+                        <span className="mr-1">{formatDate(notification.triggeredAt)}</span>
+                        {!isRead && <span className="h-2 w-2 bg-blue-500 rounded-full"></span>}
                       </div>
                     </div>
-                    <p className="text-sm mb-2">{notification.message}</p>
+                    <p className="text-sm mb-2 ml-5">{notification.message}</p>
                     <div className="flex justify-between items-center">
                       {renderStatus(notification.status)}
-                      <div className="text-xs text-gray-500">
-                        via {notification.notificationChannel}
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <span>via</span>
+                        <Badge variant="outline" className="px-1 py-0 h-5 text-[10px]">
+                          {notification.notificationChannel}
+                        </Badge>
                       </div>
                     </div>
                   </div>
