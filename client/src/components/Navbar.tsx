@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, BarChart2, Bell, MessageSquare, Settings } from "lucide-react";
+import { Home, BarChart2, Bell, MessageSquare, Settings, Link2 } from "lucide-react";
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -8,6 +8,7 @@ export default function Navbar() {
     { label: "Home", icon: Home, href: "/" },
     { label: "Advanced Analytics", icon: BarChart2, href: "/advanced-analytics" },
     { label: "Alerts", icon: Bell, href: "/alerts" },
+    { label: "Broker Connections", icon: Link2, href: "/broker" },
   ];
 
   return (

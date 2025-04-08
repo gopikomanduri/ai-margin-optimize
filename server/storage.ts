@@ -49,6 +49,7 @@ export interface IStorage {
   // Broker connection methods
   getBrokerConnections(userId: number): Promise<BrokerConnection[]>;
   getBrokerConnectionByBroker(userId: number, broker: string): Promise<BrokerConnection | undefined>;
+  getBrokerConnection(id: number): Promise<BrokerConnection | undefined>;
   createBrokerConnection(connection: InsertBrokerConnection): Promise<BrokerConnection>;
   updateBrokerConnection(id: number, connection: Partial<InsertBrokerConnection>): Promise<BrokerConnection>;
   
@@ -217,6 +218,10 @@ export class MemStorage implements IStorage {
   async getBrokerConnectionByBroker(userId: number, broker: string): Promise<BrokerConnection | undefined> {
     return Array.from(this.brokerConnections.values())
       .find(conn => conn.userId === userId && conn.broker === broker);
+  }
+  
+  async getBrokerConnection(id: number): Promise<BrokerConnection | undefined> {
+    return this.brokerConnections.get(id);
   }
   
   async createBrokerConnection(connection: InsertBrokerConnection): Promise<BrokerConnection> {
@@ -557,6 +562,14 @@ export class DatabaseStorage implements IStorage {
         eq(brokerConnections.userId, userId),
         eq(brokerConnections.broker, broker)
       ));
+      
+    return connection || undefined;
+  }
+  
+  async getBrokerConnection(id: number): Promise<BrokerConnection | undefined> {
+    const [connection] = await db.select()
+      .from(brokerConnections)
+      .where(eq(brokerConnections.id, id));
       
     return connection || undefined;
   }

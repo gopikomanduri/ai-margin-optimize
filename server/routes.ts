@@ -1877,6 +1877,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Broker authentication endpoints
+  // Zerodha authentication
+  app.post("/api/broker/zerodha/auth", async (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ success: false, message: "Username and password are required" });
+      }
+      
+      const result = await import("./services/brokerAuth").then(
+        module => module.zerodhaAuth(username, password)
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Zerodha auth error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Authentication failed" 
+      });
+    }
+  });
+  
+  app.post("/api/broker/zerodha/verify", async (req: Request, res: Response) => {
+    try {
+      const { username, pin } = req.body;
+      
+      if (!username || !pin) {
+        return res.status(400).json({ success: false, message: "Username and PIN are required" });
+      }
+      
+      const result = await import("./services/brokerAuth").then(
+        module => module.zerodhaVerify(username, pin)
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Zerodha verification error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Verification failed" 
+      });
+    }
+  });
+  
+  // Angel One authentication
+  app.post("/api/broker/angel/auth", async (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ success: false, message: "Username and password are required" });
+      }
+      
+      const result = await import("./services/brokerAuth").then(
+        module => module.angelAuth(username, password)
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Angel auth error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Authentication failed" 
+      });
+    }
+  });
+  
+  app.post("/api/broker/angel/verify", async (req: Request, res: Response) => {
+    try {
+      const { username, totp } = req.body;
+      
+      if (!username || !totp) {
+        return res.status(400).json({ success: false, message: "Username and TOTP are required" });
+      }
+      
+      const result = await import("./services/brokerAuth").then(
+        module => module.angelVerify(username, totp)
+      );
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Angel verification error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Verification failed" 
+      });
+    }
+  });
+  
+  // Get broker connections
+  app.get("/api/broker/connections", async (req: Request, res: Response) => {
+    try {
+      const connections = await storage.getBrokerConnections(DEFAULT_USER_ID);
+      
+      // Format connections for the frontend
+      const formattedConnections = connections.map(conn => ({
+        id: conn.id,
+        broker: conn.broker,
+        isActive: !!conn.isActive,
+        lastUpdated: conn.updatedAt || conn.createdAt,
+        metadata: conn.metadata || {}
+      }));
+      
+      res.json(formattedConnections);
+    } catch (error) {
+      console.error("Get broker connections error:", error);
+      res.status(500).json({ message: "Failed to get broker connections" });
+    }
+  });
+  
+  // Disconnect broker
+  app.post("/api/broker/disconnect/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      const result = await import("./services/brokerAuth").then(
+        module => module.disconnectBroker(parseInt(id))
+      );
+      
+      if (result.success) {
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ success: false, message: result.message });
+      }
+    } catch (error) {
+      console.error("Broker disconnect error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Failed to disconnect broker" 
+      });
+    }
+  });
+
   // Initialize database with seed data
   app.post("/api/database/seed", async (req: Request, res: Response) => {
     try {

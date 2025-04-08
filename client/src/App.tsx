@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
 import Alerts from "@/pages/Alerts";
+import BrokerConnection from "@/pages/BrokerConnection";
 
 import Navbar from "@/components/Navbar";
 import { AlertNotifications } from "@/components/AlertNotifications";
@@ -19,6 +20,7 @@ function Router() {
           <Route path="/" component={Home} />
           <Route path="/advanced-analytics" component={AdvancedAnalytics} />
           <Route path="/alerts" component={Alerts} />
+          <Route path="/broker" component={BrokerConnection} />
           <Route component={NotFound} />
         </Switch>
       </main>
