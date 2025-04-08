@@ -47,6 +47,7 @@ export function VoiceCommandHelp() {
           variant="ghost" 
           size="icon"
           disabled={!browserSupportsSpeechRecognition}
+          id="voice-command-help-button"
         >
           <HelpCircle className="h-4 w-4" />
         </Button>

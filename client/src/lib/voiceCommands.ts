@@ -126,13 +126,17 @@ export function useVoiceCommands(): VoiceCommandsHook {
       callback: async () => {
         try {
           // Get the first auto-trade config (as an example)
-          const configs = await apiRequest('/api/auto-trade/configs');
+          const configs = await apiRequest<any[]>('/api/auto-trade/configs');
           if (configs && configs.length > 0) {
             // Toggle the first config to enabled
-            await apiRequest(`/api/auto-trade/configs/${configs[0].id}/toggle`, {
+            const options: RequestInit = {
               method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json'
+              },
               body: JSON.stringify({ enabled: true })
-            });
+            };
+            await apiRequest(`/api/auto-trade/configs/${configs[0].id}/toggle`, options);
             notify('Voice Command', 'Auto-trade enabled');
           } else {
             notify('Voice Command', 'No auto-trade configurations found');
@@ -147,13 +151,17 @@ export function useVoiceCommands(): VoiceCommandsHook {
       callback: async () => {
         try {
           // Get the first auto-trade config (as an example)
-          const configs = await apiRequest('/api/auto-trade/configs');
+          const configs = await apiRequest<any[]>('/api/auto-trade/configs');
           if (configs && configs.length > 0) {
             // Toggle the first config to disabled
-            await apiRequest(`/api/auto-trade/configs/${configs[0].id}/toggle`, {
+            const options: RequestInit = {
               method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json'
+              },
               body: JSON.stringify({ enabled: false })
-            });
+            };
+            await apiRequest(`/api/auto-trade/configs/${configs[0].id}/toggle`, options);
             notify('Voice Command', 'Auto-trade disabled');
           } else {
             notify('Voice Command', 'No auto-trade configurations found');

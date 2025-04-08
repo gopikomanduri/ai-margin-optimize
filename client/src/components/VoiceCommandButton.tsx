@@ -58,7 +58,7 @@ export function VoiceCommandButton() {
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{isListening ? "Stop" : "Start"} voice commands</p>
+            <p>{isListening ? "Stop" : "Start"} voice commands (Ctrl+Space)</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

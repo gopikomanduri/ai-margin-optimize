@@ -11,8 +11,13 @@ import BrokerConnection from "@/pages/BrokerConnection";
 import Navbar from "@/components/Navbar";
 import { AlertNotifications } from "@/components/AlertNotifications";
 import { VoiceProvider } from "./contexts/VoiceContext";
+import VoiceTranscriptDisplay from "@/components/VoiceTranscriptDisplay";
+import useKeyboardShortcuts from "@/hooks/useKeyboardShortcuts";
 
 function Router() {
+  // Enable keyboard shortcuts
+  useKeyboardShortcuts();
+  
   return (
     <>
       <Navbar />
@@ -38,6 +43,7 @@ function App() {
             <AlertNotifications />
           </div>
           <Router />
+          <VoiceTranscriptDisplay />
         </div>
         <Toaster />
       </VoiceProvider>
