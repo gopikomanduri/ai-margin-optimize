@@ -69,6 +69,40 @@ export const eventLogs = pgTable("event_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Alert triggers table for user-defined alerts
+export const alertTriggers = pgTable("alert_triggers", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  alertType: text("alert_type").notNull(), // 'price', 'technical', 'volume', 'news', 'custom'
+  condition: text("condition").notNull(), // 'above', 'below', 'crosses', 'percent_change'
+  value: text("value").notNull(), // threshold value to trigger the alert
+  timeframe: text("timeframe"), // for technical indicators - '1m', '5m', '15m', '1h', '1d', etc.
+  indicator: text("indicator"), // 'rsi', 'macd', 'sma', 'ema', etc.
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  notifyVia: text("notify_via").notNull(), // 'app', 'email', 'sms', 'all'
+  name: text("name").notNull(),
+  description: text("description"),
+  lastTriggered: timestamp("last_triggered"),
+  cooldownMinutes: integer("cooldown_minutes").default(60), // minimum time between consecutive alerts
+  metadata: jsonb("metadata"),
+});
+
+// Alert notifications history
+export const alertNotifications = pgTable("alert_notifications", {
+  id: serial("id").primaryKey(),
+  triggerId: integer("trigger_id").notNull(), // reference to alert_triggers
+  userId: integer("user_id").notNull(),
+  symbol: text("symbol").notNull(),
+  triggeredAt: timestamp("triggered_at").notNull().defaultNow(),
+  triggerValue: text("trigger_value").notNull(), // the actual value that triggered the alert
+  message: text("message").notNull(),
+  status: text("status").notNull(), // 'delivered', 'failed', 'pending'
+  notificationChannel: text("notification_channel").notNull(), // 'app', 'email', 'sms'
+  metadata: jsonb("metadata"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -119,6 +153,33 @@ export const insertEventLogSchema = createInsertSchema(eventLogs).pick({
   details: true,
 });
 
+export const insertAlertTriggerSchema = createInsertSchema(alertTriggers).pick({
+  userId: true,
+  symbol: true,
+  alertType: true,
+  condition: true,
+  value: true,
+  timeframe: true,
+  indicator: true,
+  active: true,
+  notifyVia: true,
+  name: true,
+  description: true,
+  cooldownMinutes: true,
+  metadata: true,
+});
+
+export const insertAlertNotificationSchema = createInsertSchema(alertNotifications).pick({
+  triggerId: true,
+  userId: true,
+  symbol: true,
+  triggerValue: true,
+  message: true,
+  status: true,
+  notificationChannel: true,
+  metadata: true,
+});
+
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
@@ -126,6 +187,8 @@ export type InsertContextMemory = z.infer<typeof insertContextMemorySchema>;
 export type InsertBrokerConnection = z.infer<typeof insertBrokerConnectionSchema>;
 export type InsertTradingPosition = z.infer<typeof insertTradingPositionSchema>;
 export type InsertEventLog = z.infer<typeof insertEventLogSchema>;
+export type InsertAlertTrigger = z.infer<typeof insertAlertTriggerSchema>;
+export type InsertAlertNotification = z.infer<typeof insertAlertNotificationSchema>;
 
 export type User = typeof users.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
@@ -133,3 +196,5 @@ export type ContextMemory = typeof contextMemory.$inferSelect;
 export type BrokerConnection = typeof brokerConnections.$inferSelect;
 export type TradingPosition = typeof tradingPositions.$inferSelect;
 export type EventLog = typeof eventLogs.$inferSelect;
+export type AlertTrigger = typeof alertTriggers.$inferSelect;
+export type AlertNotification = typeof alertNotifications.$inferSelect;

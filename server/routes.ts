@@ -1,7 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from 'ws';
 import { storage } from "./storage";
-import { insertChatMessageSchema, insertContextMemorySchema } from "@shared/schema";
+import { insertChatMessageSchema, insertContextMemorySchema, insertAlertTriggerSchema } from "@shared/schema";
 import { z } from "zod";
 import { analyzeSentiment } from "./services/sentimentAnalysis";
 import { getTechnicalAnalysis } from "./services/technicalAnalysis";
@@ -14,6 +15,16 @@ import { saveToMemory, retrieveFromMemory } from "./services/mcp";
 import { optimizePortfolio } from "./services/portfolioOptimization";
 import { runMonteCarloSimulation, simulateStrategy } from "./services/monteCarloSimulation";
 import { detectAnomalies } from "./services/anomalyDetection";
+// Alert system
+import { 
+  getAlertsByUser,
+  getAlertsBySymbol,
+  createAlert, 
+  updateAlert, 
+  deleteAlert, 
+  getAlertNotifications,
+  checkPriceAlerts
+} from "./services/alertService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Default user ID (for demo purposes)
@@ -623,6 +634,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // --------------- ALERT SYSTEM API ENDPOINTS ---------------
+  
+  // Get alerts for current user
+  app.get("/api/alerts", async (req: Request, res: Response) => {
+    try {
+      const alerts = await getAlertsByUser(DEFAULT_USER_ID);
+      res.json(alerts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch alerts" });
+    }
+  });
+  
+  // Get alerts for a specific symbol
+  app.get("/api/alerts/symbol/:symbol", async (req: Request, res: Response) => {
+    try {
+      const { symbol } = req.params;
+      const alerts = await getAlertsBySymbol(symbol);
+      res.json(alerts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch alerts for symbol" });
+    }
+  });
+  
+  // Create a new alert
+  app.post("/api/alerts", async (req: Request, res: Response) => {
+    try {
+      const alertData = insertAlertTriggerSchema.parse({
+        ...req.body,
+        userId: DEFAULT_USER_ID
+      });
+      
+      const newAlert = await createAlert(alertData);
+      
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "alert_created",
+        details: {
+          alertId: newAlert.id,
+          symbol: newAlert.symbol,
+          alertType: newAlert.alertType
+        }
+      });
+      
+      res.status(201).json(newAlert);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid alert data", 
+          errors: error.errors 
+        });
+      }
+      res.status(500).json({ message: "Failed to create alert" });
+    }
+  });
+  
+  // Update an existing alert
+  app.put("/api/alerts/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const alertId = parseInt(id, 10);
+      
+      if (isNaN(alertId)) {
+        return res.status(400).json({ message: "Invalid alert ID" });
+      }
+      
+      const updatedAlert = await updateAlert(alertId, DEFAULT_USER_ID, req.body);
+      
+      if (!updatedAlert) {
+        return res.status(404).json({ message: "Alert not found or you don't have permission" });
+      }
+      
+      res.json(updatedAlert);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update alert" });
+    }
+  });
+  
+  // Delete (deactivate) an alert
+  app.delete("/api/alerts/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const alertId = parseInt(id, 10);
+      
+      if (isNaN(alertId)) {
+        return res.status(400).json({ message: "Invalid alert ID" });
+      }
+      
+      const success = await deleteAlert(alertId, DEFAULT_USER_ID);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Alert not found or you don't have permission" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete alert" });
+    }
+  });
+  
+  // Get alert notifications history
+  app.get("/api/alert-notifications", async (req: Request, res: Response) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+      const notifications = await getAlertNotifications(DEFAULT_USER_ID, limit);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+  
+  // Simulate a price alert trigger (for testing)
+  app.post("/api/alerts/simulate/price", async (req: Request, res: Response) => {
+    try {
+      const { symbol, price } = req.body;
+      
+      if (!symbol || price === undefined) {
+        return res.status(400).json({ message: "Symbol and price are required" });
+      }
+      
+      const priceData = {
+        symbol,
+        price: parseFloat(price),
+        timestamp: new Date(),
+      };
+      
+      const triggeredAlerts = await checkPriceAlerts(priceData);
+      
+      res.json({
+        triggered: triggeredAlerts.length > 0,
+        count: triggeredAlerts.length,
+        alerts: triggeredAlerts
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to simulate price alert" });
+    }
+  });
+
+  // Initialize HTTP server with Express app
   const httpServer = createServer(app);
+  
+  // Initialize WebSocket server for real-time alerts
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Connected WebSocket clients mapped by user ID
+  const connectedClients = new Map<number, WebSocket[]>();
+  
+  wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
+    
+    // Set the default user ID initially (demo purposes)
+    let userId = DEFAULT_USER_ID;
+    
+    // Add to connected clients
+    if (!connectedClients.has(userId)) {
+      connectedClients.set(userId, []);
+    }
+    connectedClients.get(userId)!.push(ws);
+    
+    // Authenticate user - in a real app, this would verify a token
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        // Handle different message types
+        if (data.type === 'authenticate') {
+          // In a real app, verify token here
+          userId = data.userId || DEFAULT_USER_ID;
+          console.log(`Client authenticated as user ${userId}`);
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    });
+    
+    // When client disconnects
+    ws.on('close', () => {
+      if (connectedClients.has(userId)) {
+        const userClients = connectedClients.get(userId)!;
+        const index = userClients.indexOf(ws);
+        if (index !== -1) {
+          userClients.splice(index, 1);
+        }
+        
+        // Clean up empty user entries
+        if (userClients.length === 0) {
+          connectedClients.delete(userId);
+        }
+      }
+      console.log('WebSocket client disconnected');
+    });
+    
+    // Send initial connection success message
+    ws.send(JSON.stringify({ 
+      type: 'connection', 
+      status: 'connected',
+      timestamp: new Date().toISOString()
+    }));
+  });
+  
+  // Helper function to send alerts to connected clients
+  function sendAlertToUser(userId: number, alertData: any) {
+    if (connectedClients.has(userId)) {
+      const userClients = connectedClients.get(userId)!;
+      
+      userClients.forEach(client => {
+        // Check if the connection is still open
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'alert',
+            data: alertData,
+            timestamp: new Date().toISOString()
+          }));
+        }
+      });
+    }
+  }
+  
   return httpServer;
 }

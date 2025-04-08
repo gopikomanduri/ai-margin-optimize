@@ -5,8 +5,10 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
+import Alerts from "@/pages/Alerts";
 
 import Navbar from "@/components/Navbar";
+import { AlertNotifications } from "@/components/AlertNotifications";
 
 function Router() {
   return (
@@ -16,6 +18,7 @@ function Router() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/advanced-analytics" component={AdvancedAnalytics} />
+          <Route path="/alerts" component={Alerts} />
           <Route component={NotFound} />
         </Switch>
       </main>
@@ -27,6 +30,9 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen flex flex-col">
+        <div className="fixed top-4 right-4 z-50">
+          <AlertNotifications />
+        </div>
         <Router />
       </div>
       <Toaster />
