@@ -4,6 +4,10 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { storage } from "./storage";
 import { insertChatMessageSchema, insertContextMemorySchema, insertAlertTriggerSchema } from "@shared/schema";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+import { alertTriggers, alertNotifications } from "@shared/schema";
+import seedDatabase from "./seed";
 import { analyzeSentiment } from "./services/sentimentAnalysis";
 import { getTechnicalAnalysis } from "./services/technicalAnalysis";
 import { getCorporateActions } from "./services/corporateActions";
@@ -762,13 +766,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const triggeredAlerts = await checkPriceAlerts(priceData);
       
+      // Create notification for UI demo if none triggered
+      if (triggeredAlerts.length === 0) {
+        // Get one alert of the proper type to simulate a trigger
+        const alerts = await db
+          .select()
+          .from(alertTriggers)
+          .where(eq(alertTriggers.symbol, symbol))
+          .limit(1);
+          
+        if (alerts.length > 0) {
+          const alert = alerts[0];
+          const notification = {
+            triggerId: alert.id,
+            userId: DEFAULT_USER_ID,
+            symbol,
+            triggeredAt: new Date(),
+            triggerValue: price.toString(),
+            message: `${symbol} price is now $${price} (${alert.condition} your target of $${alert.value})`,
+            status: "delivered" as const,
+            notificationChannel: "app" as const
+          };
+          
+          const [insertedNotification] = await db.insert(alertNotifications).values(notification).returning();
+          
+          // Send notification to connected WebSocket clients
+          sendAlertToUser(DEFAULT_USER_ID, insertedNotification);
+          
+          triggeredAlerts.push(alert);
+        }
+      }
+      
       res.json({
         triggered: triggeredAlerts.length > 0,
         count: triggeredAlerts.length,
         alerts: triggeredAlerts
       });
     } catch (error) {
+      console.error("Error simulating price alert:", error);
       res.status(500).json({ message: "Failed to simulate price alert" });
+    }
+  });
+  
+  // Demo API to create various alert types
+  app.post("/api/demo/seed", async (req: Request, res: Response) => {
+    try {
+      await seedDatabase();
+      res.json({ success: true, message: "Demo data seeded successfully" });
+    } catch (error) {
+      console.error("Error seeding demo data:", error);
+      res.status(500).json({ message: "Failed to seed demo data" });
+    }
+  });
+  
+  // Send a simulated real-time notification for demo purposes
+  app.post("/api/demo/notify", async (req: Request, res: Response) => {
+    try {
+      const { symbol, type = "price", price, value } = req.body;
+      
+      if (!symbol) {
+        return res.status(400).json({ message: "Symbol is required" });
+      }
+      
+      // Get a random alert for this user
+      const alerts = await db
+        .select()
+        .from(alertTriggers)
+        .where(eq(alertTriggers.userId, DEFAULT_USER_ID))
+        .limit(10);
+      
+      if (alerts.length === 0) {
+        return res.status(404).json({ message: "No alerts found for this user" });
+      }
+      
+      // Select an alert based on type if provided, otherwise random
+      const filteredAlerts = type ? alerts.filter(a => a.alertType === type) : alerts;
+      const alert = filteredAlerts.length > 0 
+        ? filteredAlerts[Math.floor(Math.random() * filteredAlerts.length)]
+        : alerts[Math.floor(Math.random() * alerts.length)];
+      
+      // Create a notification message based on the alert type
+      let message = '';
+      let triggerValue = value || '0';
+      
+      switch (alert.alertType) {
+        case 'price':
+          const priceValue = price || (parseFloat(alert.value) * (alert.condition === 'above' ? 1.05 : 0.95)).toFixed(2);
+          triggerValue = priceValue.toString();
+          message = `${alert.symbol} price has ${alert.condition === 'above' ? 'risen above' : 'fallen below'} $${alert.value} to $${priceValue}`;
+          break;
+        case 'technical':
+          const indicatorValue = value || (alert.condition === 'above' ? '75' : '25');
+          triggerValue = indicatorValue;
+          message = `${alert.symbol} ${alert.indicator?.toUpperCase()} has ${alert.condition === 'above' ? 'risen above' : 'fallen below'} ${alert.value} to ${indicatorValue} (${alert.timeframe})`;
+          break;
+        case 'volume':
+          const volumeValue = value || '25000000';
+          triggerValue = volumeValue;
+          message = `${alert.symbol} trading volume has ${alert.condition === 'above' ? 'exceeded' : 'fallen below'} ${alert.value} to ${volumeValue}`;
+          break;
+        case 'news':
+          message = `Breaking news for ${alert.symbol}: Major announcement affecting stock price`;
+          break;
+        default:
+          message = `Alert triggered for ${alert.symbol}`;
+      }
+      
+      // Create notification
+      const notification = {
+        triggerId: alert.id,
+        userId: DEFAULT_USER_ID,
+        symbol: alert.symbol,
+        triggeredAt: new Date(),
+        triggerValue,
+        message,
+        status: "delivered" as const,
+        notificationChannel: "app" as const
+      };
+      
+      const [insertedNotification] = await db.insert(alertNotifications).values(notification).returning();
+      
+      // Send notification to connected WebSocket clients
+      sendAlertToUser(DEFAULT_USER_ID, insertedNotification);
+      
+      res.json({
+        success: true,
+        notification: insertedNotification,
+        message: "Notification sent successfully"
+      });
+    } catch (error) {
+      console.error("Error sending demo notification:", error);
+      res.status(500).json({ message: "Failed to send notification" });
     }
   });
 
