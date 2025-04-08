@@ -1,8 +1,12 @@
 import { Link, useLocation } from "wouter";
 import { Home, BarChart2, Bell, MessageSquare, Settings, Link2 } from "lucide-react";
+import VoiceCommandButton from "./VoiceCommandButton";
+import VoiceCommandHelp from "./VoiceCommandHelp";
+import { useVoice } from "../contexts/VoiceContext";
 
 export default function Navbar() {
   const [location] = useLocation();
+  const { isListening, transcript } = useVoice();
 
   const navItems = [
     { label: "Home", icon: Home, href: "/" },
@@ -33,8 +37,19 @@ export default function Navbar() {
                 </a>
               </Link>
             ))}
+            
+            <div className="ml-2 flex items-center space-x-1">
+              <VoiceCommandButton />
+              <VoiceCommandHelp />
+            </div>
           </div>
         </div>
+        
+        {isListening && transcript && (
+          <div className="text-xs text-center py-1 bg-accent text-accent-foreground animate-pulse">
+            Listening: "{transcript}"
+          </div>
+        )}
       </div>
     </nav>
   );

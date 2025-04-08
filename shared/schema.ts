@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json, jsonb, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, jsonb, date, interval } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -153,6 +153,25 @@ export const tradingGoals = pgTable("trading_goals", {
   metadata: jsonb("metadata"),
 });
 
+// Auto-trade configuration table
+export const autoTradeConfigs = pgTable("auto_trade_configs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  symbols: jsonb("symbols").notNull(), // Array of symbols to auto-trade
+  signalSources: jsonb("signal_sources").notNull(), // Array of signal sources to use
+  minConfidence: integer("min_confidence").notNull().default(70), // 0-100 scale
+  maxPositions: integer("max_positions").notNull().default(3),
+  checkInterval: integer("check_interval").notNull().default(300000), // milliseconds
+  riskParameters: jsonb("risk_parameters").notNull(), // Risk management settings
+  lastCheckTime: timestamp("last_check_time"),
+  lastTradeTime: timestamp("last_trade_time"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  metadata: jsonb("metadata"),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -269,6 +288,21 @@ export const insertTradingGoalSchema = createInsertSchema(tradingGoals).pick({
   metadata: true,
 });
 
+export const insertAutoTradeConfigSchema = createInsertSchema(autoTradeConfigs).pick({
+  userId: true,
+  name: true,
+  enabled: true,
+  symbols: true,
+  signalSources: true,
+  minConfidence: true,
+  maxPositions: true,
+  checkInterval: true,
+  riskParameters: true,
+  lastCheckTime: true,
+  lastTradeTime: true,
+  metadata: true,
+});
+
 // Type exports
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
@@ -281,6 +315,7 @@ export type InsertAlertNotification = z.infer<typeof insertAlertNotificationSche
 export type InsertBadgeDefinition = z.infer<typeof insertBadgeDefinitionSchema>;
 export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
 export type InsertTradingGoal = z.infer<typeof insertTradingGoalSchema>;
+export type InsertAutoTradeConfig = z.infer<typeof insertAutoTradeConfigSchema>;
 
 export type User = typeof users.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
@@ -293,3 +328,4 @@ export type AlertNotification = typeof alertNotifications.$inferSelect;
 export type BadgeDefinition = typeof badgeDefinitions.$inferSelect;
 export type UserBadge = typeof userBadges.$inferSelect;
 export type TradingGoal = typeof tradingGoals.$inferSelect;
+export type AutoTradeConfig = typeof autoTradeConfigs.$inferSelect;

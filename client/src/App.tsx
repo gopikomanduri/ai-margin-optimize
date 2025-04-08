@@ -10,6 +10,7 @@ import BrokerConnection from "@/pages/BrokerConnection";
 
 import Navbar from "@/components/Navbar";
 import { AlertNotifications } from "@/components/AlertNotifications";
+import { VoiceProvider } from "./contexts/VoiceContext";
 
 function Router() {
   return (
@@ -31,13 +32,15 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen flex flex-col">
-        <div className="fixed top-4 right-4 z-50">
-          <AlertNotifications />
+      <VoiceProvider>
+        <div className="min-h-screen flex flex-col">
+          <div className="fixed top-4 right-4 z-50">
+            <AlertNotifications />
+          </div>
+          <Router />
         </div>
-        <Router />
-      </div>
-      <Toaster />
+        <Toaster />
+      </VoiceProvider>
     </QueryClientProvider>
   );
 }

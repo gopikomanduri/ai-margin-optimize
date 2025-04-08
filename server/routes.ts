@@ -20,6 +20,7 @@ import { seedBadgeDefinitions } from "./services/badgeService";
 import * as badgeService from "./services/badgeService";
 import * as goalService from "./services/goalService";
 import * as eventService from "./services/eventService";
+import * as autoTradeScheduler from "./services/autoTradeScheduler";
 // New AI and Mathematical Models
 import { optimizePortfolio } from "./services/portfolioOptimization";
 import { runMonteCarloSimulation, simulateStrategy } from "./services/monteCarloSimulation";
@@ -2025,6 +2026,256 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error seeding database:', error);
       res.status(500).json({ message: "Failed to seed database" });
+    }
+  });
+  
+  /*** Auto-Trade Configuration Routes ***/
+  
+  // Get all auto-trade configurations for a user
+  app.get("/api/auto-trade/configs", async (req: Request, res: Response) => {
+    try {
+      const configs = await storage.getAutoTradeConfigs(DEFAULT_USER_ID);
+      res.json(configs);
+    } catch (error) {
+      console.error("Error fetching auto-trade configs:", error);
+      res.status(500).json({ message: "Failed to fetch auto-trade configurations" });
+    }
+  });
+  
+  // Get a specific auto-trade configuration
+  app.get("/api/auto-trade/configs/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const configId = parseInt(id, 10);
+      
+      if (isNaN(configId)) {
+        return res.status(400).json({ message: "Invalid configuration ID" });
+      }
+      
+      const config = await storage.getAutoTradeConfig(configId);
+      
+      if (!config) {
+        return res.status(404).json({ message: "Auto-trade configuration not found" });
+      }
+      
+      if (config.userId !== DEFAULT_USER_ID) {
+        return res.status(403).json({ message: "Unauthorized access to configuration" });
+      }
+      
+      res.json(config);
+    } catch (error) {
+      console.error("Error fetching auto-trade config:", error);
+      res.status(500).json({ message: "Failed to fetch auto-trade configuration" });
+    }
+  });
+  
+  // Create a new auto-trade configuration
+  app.post("/api/auto-trade/configs", async (req: Request, res: Response) => {
+    try {
+      const configData = req.body;
+      
+      if (!configData.name || !configData.symbols || !configData.signalSources) {
+        return res.status(400).json({ message: "Missing required configuration fields" });
+      }
+      
+      const autoTradeConfig = await storage.createAutoTradeConfig({
+        userId: DEFAULT_USER_ID,
+        name: configData.name,
+        symbols: configData.symbols,
+        signalSources: configData.signalSources,
+        minConfidence: configData.minConfidence || 0.7,
+        maxPositions: configData.maxPositions || 5,
+        checkInterval: configData.checkInterval || 15, // minutes
+        riskParameters: configData.riskParameters || {
+          maxPositionSize: 0.1,      // 10% of portfolio per position
+          maxDrawdown: 0.05,         // 5% max drawdown
+          stopLossPercent: 0.02,     // 2% stop loss
+          takeProfitPercent: 0.05    // 5% take profit
+        },
+        enabled: configData.enabled || false,
+        metadata: configData.metadata || {},
+        lastCheckTime: null,
+        lastTradeTime: null
+      });
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "auto_trade_config_created",
+        details: {
+          configId: autoTradeConfig.id,
+          name: autoTradeConfig.name,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      res.status(201).json(autoTradeConfig);
+    } catch (error) {
+      console.error("Error creating auto-trade config:", error);
+      res.status(500).json({ message: "Failed to create auto-trade configuration" });
+    }
+  });
+  
+  // Update an auto-trade configuration
+  app.put("/api/auto-trade/configs/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const configId = parseInt(id, 10);
+      const updateData = req.body;
+      
+      if (isNaN(configId)) {
+        return res.status(400).json({ message: "Invalid configuration ID" });
+      }
+      
+      // Check if the config exists and belongs to the user
+      const existingConfig = await storage.getAutoTradeConfig(configId);
+      
+      if (!existingConfig) {
+        return res.status(404).json({ message: "Auto-trade configuration not found" });
+      }
+      
+      if (existingConfig.userId !== DEFAULT_USER_ID) {
+        return res.status(403).json({ message: "Unauthorized access to configuration" });
+      }
+      
+      const updatedConfig = await storage.updateAutoTradeConfig(configId, updateData);
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "auto_trade_config_updated",
+        details: {
+          configId: updatedConfig.id,
+          name: updatedConfig.name,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      res.json(updatedConfig);
+    } catch (error) {
+      console.error("Error updating auto-trade config:", error);
+      res.status(500).json({ message: "Failed to update auto-trade configuration" });
+    }
+  });
+  
+  // Enable/disable an auto-trade configuration
+  app.patch("/api/auto-trade/configs/:id/toggle", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const configId = parseInt(id, 10);
+      const { enabled } = req.body;
+      
+      if (isNaN(configId)) {
+        return res.status(400).json({ message: "Invalid configuration ID" });
+      }
+      
+      if (enabled === undefined) {
+        return res.status(400).json({ message: "Enabled status is required" });
+      }
+      
+      // Check if the config exists and belongs to the user
+      const existingConfig = await storage.getAutoTradeConfig(configId);
+      
+      if (!existingConfig) {
+        return res.status(404).json({ message: "Auto-trade configuration not found" });
+      }
+      
+      if (existingConfig.userId !== DEFAULT_USER_ID) {
+        return res.status(403).json({ message: "Unauthorized access to configuration" });
+      }
+      
+      const updatedConfig = await storage.toggleAutoTradeConfig(configId, enabled);
+      
+      // Start or stop the auto-trade scheduler based on the enabled status
+      if (enabled) {
+        const started = await autoTradeScheduler.startAutoTradeScheduler({
+          userId: updatedConfig.userId,
+          enabled: true,
+          symbols: updatedConfig.symbols as string[],
+          signalSources: updatedConfig.signalSources as string[],
+          minConfidence: updatedConfig.minConfidence,
+          maxPositions: updatedConfig.maxPositions,
+          checkInterval: updatedConfig.checkInterval,
+          riskParameters: updatedConfig.riskParameters as any
+        });
+        
+        if (!started) {
+          return res.status(500).json({ message: "Failed to start auto-trade scheduler" });
+        }
+      } else {
+        autoTradeScheduler.stopAutoTradeScheduler(updatedConfig.userId);
+      }
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: enabled ? "auto_trade_enabled" : "auto_trade_disabled",
+        details: {
+          configId: updatedConfig.id,
+          name: updatedConfig.name,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      res.json(updatedConfig);
+    } catch (error) {
+      console.error("Error toggling auto-trade config:", error);
+      res.status(500).json({ message: "Failed to toggle auto-trade configuration" });
+    }
+  });
+  
+  // Delete an auto-trade configuration
+  app.delete("/api/auto-trade/configs/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const configId = parseInt(id, 10);
+      
+      if (isNaN(configId)) {
+        return res.status(400).json({ message: "Invalid configuration ID" });
+      }
+      
+      // Check if the config exists and belongs to the user
+      const existingConfig = await storage.getAutoTradeConfig(configId);
+      
+      if (!existingConfig) {
+        return res.status(404).json({ message: "Auto-trade configuration not found" });
+      }
+      
+      if (existingConfig.userId !== DEFAULT_USER_ID) {
+        return res.status(403).json({ message: "Unauthorized access to configuration" });
+      }
+      
+      // If the auto-trade is enabled, stop it first
+      if (existingConfig.enabled) {
+        autoTradeScheduler.stopAutoTradeScheduler(existingConfig.userId);
+      }
+      
+      // For now, we're just updating the configuration as disabled instead of deleting it
+      // This allows us to keep a record of past configurations
+      const updatedConfig = await storage.updateAutoTradeConfig(configId, {
+        enabled: false,
+        metadata: {
+          ...existingConfig.metadata as any,
+          deletedAt: new Date().toISOString(),
+          isDeleted: true
+        }
+      });
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "auto_trade_config_deleted",
+        details: {
+          configId: updatedConfig.id,
+          name: updatedConfig.name,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting auto-trade config:", error);
+      res.status(500).json({ message: "Failed to delete auto-trade configuration" });
     }
   });
   

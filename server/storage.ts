@@ -17,6 +17,8 @@ import {
   InsertUserBadge,
   TradingGoal,
   InsertTradingGoal,
+  AutoTradeConfig,
+  InsertAutoTradeConfig,
   // Table references for database queries
   users,
   chatMessages,
@@ -26,7 +28,8 @@ import {
   eventLogs,
   badgeDefinitions,
   userBadges,
-  tradingGoals
+  tradingGoals,
+  autoTradeConfigs
 } from "@shared/schema";
 import { db } from "./db";
 import { and, desc, eq } from "drizzle-orm";
@@ -83,6 +86,13 @@ export interface IStorage {
   createTradingGoal(goal: InsertTradingGoal): Promise<TradingGoal>;
   updateTradingGoal(id: number, goal: Partial<InsertTradingGoal>): Promise<TradingGoal>;
   completeTradingGoal(id: number): Promise<TradingGoal>;
+  
+  // Auto-trade configuration methods
+  getAutoTradeConfigs(userId: number): Promise<AutoTradeConfig[]>;
+  getAutoTradeConfig(id: number): Promise<AutoTradeConfig | undefined>;
+  createAutoTradeConfig(config: InsertAutoTradeConfig): Promise<AutoTradeConfig>;
+  updateAutoTradeConfig(id: number, config: Partial<InsertAutoTradeConfig>): Promise<AutoTradeConfig>;
+  toggleAutoTradeConfig(id: number, enabled: boolean): Promise<AutoTradeConfig>;
 }
 
 export class MemStorage implements IStorage {
@@ -95,6 +105,7 @@ export class MemStorage implements IStorage {
   private badgeDefinitions: Map<number, BadgeDefinition>;
   private userBadges: Map<number, UserBadge>;
   private tradingGoals: Map<number, TradingGoal>;
+  private autoTradeConfigs: Map<number, AutoTradeConfig>;
   
   private userIdCounter: number;
   private messageIdCounter: number;
@@ -105,6 +116,7 @@ export class MemStorage implements IStorage {
   private badgeDefinitionIdCounter: number;
   private userBadgeIdCounter: number;
   private tradingGoalIdCounter: number;
+  private autoTradeConfigIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -116,6 +128,7 @@ export class MemStorage implements IStorage {
     this.badgeDefinitions = new Map();
     this.userBadges = new Map();
     this.tradingGoals = new Map();
+    this.autoTradeConfigs = new Map();
     
     this.userIdCounter = 1;
     this.messageIdCounter = 1;
@@ -126,6 +139,7 @@ export class MemStorage implements IStorage {
     this.badgeDefinitionIdCounter = 1;
     this.userBadgeIdCounter = 1;
     this.tradingGoalIdCounter = 1;
+    this.autoTradeConfigIdCounter = 1;
     
     // Create a default user
     this.createUser({
@@ -472,6 +486,63 @@ export class MemStorage implements IStorage {
     
     this.tradingGoals.set(id, completedGoal);
     return completedGoal;
+  }
+  
+  // Auto-trade configuration methods
+  async getAutoTradeConfigs(userId: number): Promise<AutoTradeConfig[]> {
+    return Array.from(this.autoTradeConfigs.values())
+      .filter(config => config.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getAutoTradeConfig(id: number): Promise<AutoTradeConfig | undefined> {
+    return this.autoTradeConfigs.get(id);
+  }
+
+  async createAutoTradeConfig(config: InsertAutoTradeConfig): Promise<AutoTradeConfig> {
+    const id = this.autoTradeConfigIdCounter++;
+    const now = new Date();
+    const autoTradeConfig: AutoTradeConfig = {
+      ...config,
+      id,
+      createdAt: now,
+      updatedAt: now,
+      enabled: config.enabled ?? false
+    };
+    this.autoTradeConfigs.set(id, autoTradeConfig);
+    return autoTradeConfig;
+  }
+
+  async updateAutoTradeConfig(id: number, config: Partial<InsertAutoTradeConfig>): Promise<AutoTradeConfig> {
+    const existingConfig = this.autoTradeConfigs.get(id);
+    if (!existingConfig) {
+      throw new Error(`Auto-trade configuration with id ${id} not found`);
+    }
+    
+    const updatedConfig: AutoTradeConfig = {
+      ...existingConfig,
+      ...config,
+      updatedAt: new Date()
+    };
+    
+    this.autoTradeConfigs.set(id, updatedConfig);
+    return updatedConfig;
+  }
+
+  async toggleAutoTradeConfig(id: number, enabled: boolean): Promise<AutoTradeConfig> {
+    const existingConfig = this.autoTradeConfigs.get(id);
+    if (!existingConfig) {
+      throw new Error(`Auto-trade configuration with id ${id} not found`);
+    }
+    
+    const updatedConfig: AutoTradeConfig = {
+      ...existingConfig,
+      enabled,
+      updatedAt: new Date()
+    };
+    
+    this.autoTradeConfigs.set(id, updatedConfig);
+    return updatedConfig;
   }
 }
 
@@ -843,6 +914,60 @@ export class DatabaseStorage implements IStorage {
       .returning();
       
     return completedGoal;
+  }
+  
+  // Auto-trade configuration methods
+  async getAutoTradeConfigs(userId: number): Promise<AutoTradeConfig[]> {
+    return await db.select()
+      .from(autoTradeConfigs)
+      .where(eq(autoTradeConfigs.userId, userId))
+      .orderBy(desc(autoTradeConfigs.createdAt));
+  }
+  
+  async getAutoTradeConfig(id: number): Promise<AutoTradeConfig | undefined> {
+    const [config] = await db.select()
+      .from(autoTradeConfigs)
+      .where(eq(autoTradeConfigs.id, id));
+      
+    return config || undefined;
+  }
+  
+  async createAutoTradeConfig(config: InsertAutoTradeConfig): Promise<AutoTradeConfig> {
+    const now = new Date();
+    const [autoTradeConfig] = await db.insert(autoTradeConfigs)
+      .values({
+        ...config,
+        createdAt: now,
+        updatedAt: now,
+        enabled: config.enabled ?? false
+      })
+      .returning();
+      
+    return autoTradeConfig;
+  }
+  
+  async updateAutoTradeConfig(id: number, config: Partial<InsertAutoTradeConfig>): Promise<AutoTradeConfig> {
+    const [updatedConfig] = await db.update(autoTradeConfigs)
+      .set({
+        ...config,
+        updatedAt: new Date()
+      })
+      .where(eq(autoTradeConfigs.id, id))
+      .returning();
+      
+    return updatedConfig;
+  }
+  
+  async toggleAutoTradeConfig(id: number, enabled: boolean): Promise<AutoTradeConfig> {
+    const [updatedConfig] = await db.update(autoTradeConfigs)
+      .set({
+        enabled,
+        updatedAt: new Date()
+      })
+      .where(eq(autoTradeConfigs.id, id))
+      .returning();
+      
+    return updatedConfig;
   }
 }
 
