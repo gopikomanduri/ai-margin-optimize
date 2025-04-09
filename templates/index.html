@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Margin Optimizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-graph-up-arrow me-2"></i>
+                AI Margin Optimizer
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/"><i class="bi bi-house"></i> Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="bi bi-briefcase"></i> Portfolio</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="bi bi-newspaper"></i> News</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#"><i class="bi bi-graph-up"></i> Analysis</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <button id="connectBrokerBtn" class="btn btn-light me-2" type="button">
+                        <i class="bi bi-link"></i> Connect Broker
+                    </button>
+                    <div class="dropdown">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-gear"></i> Settings</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-lg-3 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-person-circle me-2"></i>Account Summary
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <div>Available Margin</div>
+                            <div class="text-success fw-bold" id="availableMargin">₹150,000</div>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <div>Used Margin</div>
+                            <div class="text-danger fw-bold" id="usedMargin">₹350,000</div>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <div>Total Margin</div>
+                            <div class="fw-bold" id="totalMargin">₹500,000</div>
+                        </div>
+                        <div class="progress mb-3">
+                            <div id="marginProgressBar" class="progress-bar bg-danger" role="progressbar" style="width: 70%"></div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <h6 class="mb-3"><i class="bi bi-speedometer2 me-2"></i>Optimization Summary</h6>
+                        <div class="d-flex justify-content-between mb-2">
+                            <div>Current Margin</div>
+                            <div class="fw-bold" id="currentMargin">₹350,000</div>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <div>Optimized Margin</div>
+                            <div class="text-success fw-bold" id="optimizedMargin">₹280,000</div>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <div>Potential Savings</div>
+                            <div class="text-success fw-bold" id="potentialSavings">₹70,000</div>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <div>Reduction</div>
+                            <div class="text-success fw-bold" id="reductionPercentage">20%</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 mt-3">
+                            <button class="btn btn-primary" id="applyOptimizationBtn">
+                                <i class="bi bi-magic me-2"></i>Apply Optimization
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card shadow-sm mt-4">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-newspaper me-2"></i>Latest News
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <ul class="list-group list-group-flush" id="newsList">
+                            <li class="list-group-item">
+                                <small class="text-muted d-block">RELIANCE • 2h ago</small>
+                                <a href="#" class="text-decoration-none">Reliance announces new green energy initiative</a>
+                            </li>
+                            <li class="list-group-item">
+                                <small class="text-muted d-block">HDFCBANK • 5h ago</small>
+                                <a href="#" class="text-decoration-none">HDFC Bank Q4 results exceed analyst expectations</a>
+                            </li>
+                            <li class="list-group-item">
+                                <small class="text-muted d-block">TCS • 1d ago</small>
+                                <a href="#" class="text-decoration-none">TCS wins major contract with European retailer</a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-footer bg-light text-center">
+                        <a href="#" class="text-decoration-none">View All News</a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="col-lg-9">
+                <!-- Market Overview -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-graph-up-arrow me-2"></i>Market Overview
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="marketIndices">
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">NIFTY 50</h6>
+                                        <h4 class="mb-2" id="niftyValue">22,502.00</h4>
+                                        <div class="text-success">
+                                            <i class="bi bi-arrow-up-right"></i>
+                                            <span id="niftyChange">+150.25 (+0.67%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">BANK NIFTY</h6>
+                                        <h4 class="mb-2" id="bankNiftyValue">47,380.45</h4>
+                                        <div class="text-danger">
+                                            <i class="bi bi-arrow-down-right"></i>
+                                            <span id="bankNiftyChange">-120.65 (-0.25%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">SENSEX</h6>
+                                        <h4 class="mb-2" id="sensexValue">73,968.70</h4>
+                                        <div class="text-success">
+                                            <i class="bi bi-arrow-up-right"></i>
+                                            <span id="sensexChange">+430.30 (+0.58%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-2" id="macroIndicators">
+                            <div class="col-md-3 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body py-2">
+                                        <div class="d-flex justify-content-between">
+                                            <div>INR/USD</div>
+                                            <div id="inrValue">83.45</div>
+                                        </div>
+                                        <div class="text-danger small">
+                                            <i class="bi bi-arrow-down-right"></i>
+                                            <span id="inrChange">-0.15 (-0.18%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body py-2">
+                                        <div class="d-flex justify-content-between">
+                                            <div>Crude Oil</div>
+                                            <div id="crudeValue">$85.30</div>
+                                        </div>
+                                        <div class="text-success small">
+                                            <i class="bi bi-arrow-up-right"></i>
+                                            <span id="crudeChange">+0.85 (+1.01%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body py-2">
+                                        <div class="d-flex justify-content-between">
+                                            <div>Gold</div>
+                                            <div id="goldValue">$2,340.25</div>
+                                        </div>
+                                        <div class="text-success small">
+                                            <i class="bi bi-arrow-up-right"></i>
+                                            <span id="goldChange">+12.50 (+0.54%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body py-2">
+                                        <div class="d-flex justify-content-between">
+                                            <div>VIX</div>
+                                            <div id="vixValue">14.35</div>
+                                        </div>
+                                        <div class="text-danger small">
+                                            <i class="bi bi-arrow-down-right"></i>
+                                            <span id="vixChange">-0.55 (-3.76%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Portfolio Overview -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-briefcase me-2"></i>Portfolio & F&O Positions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs" id="portfolioTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="positions-tab" data-bs-toggle="tab" data-bs-target="#positions" type="button" role="tab">F&O Positions</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="holdings-tab" data-bs-toggle="tab" data-bs-target="#holdings" type="button" role="tab">Holdings</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content mt-3" id="portfolioTabContent">
+                            <div class="tab-pane fade show active" id="positions" role="tabpanel">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Symbol</th>
+                                                <th>Qty</th>
+                                                <th>Avg Price</th>
+                                                <th>Current Price</th>
+                                                <th>P&L</th>
+                                                <th>Margin Used</th>
+                                                <th>Sentiment</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="positionsTableBody">
+                                            <tr>
+                                                <td>NIFTY APR FUT</td>
+                                                <td>75</td>
+                                                <td>₹22,450</td>
+                                                <td>₹22,500</td>
+                                                <td class="text-success">₹3,750</td>
+                                                <td>₹225,000</td>
+                                                <td><span class="badge bg-success">Positive</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td>BANKNIFTY APR FUT</td>
+                                                <td>25</td>
+                                                <td>₹47,500</td>
+                                                <td>₹47,400</td>
+                                                <td class="text-danger">-₹2,500</td>
+                                                <td>₹125,000</td>
+                                                <td><span class="badge bg-warning text-dark">Neutral</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="tab-pane fade" id="holdings" role="tabpanel">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Symbol</th>
+                                                <th>Qty</th>
+                                                <th>Avg Price</th>
+                                                <th>Current Price</th>
+                                                <th>P&L</th>
+                                                <th>P&L %</th>
+                                                <th>Sentiment</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="holdingsTableBody">
+                                            <tr>
+                                                <td>RELIANCE</td>
+                                                <td>10</td>
+                                                <td>₹2,500.50</td>
+                                                <td>₹2,650.75</td>
+                                                <td class="text-success">₹1,502.50</td>
+                                                <td class="text-success">6.01%</td>
+                                                <td><span class="badge bg-success">Positive</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td>HDFCBANK</td>
+                                                <td>15</td>
+                                                <td>₹1,600.25</td>
+                                                <td>₹1,550.50</td>
+                                                <td class="text-danger">-₹744.75</td>
+                                                <td class="text-danger">-3.11%</td>
+                                                <td><span class="badge bg-danger">Negative</span></td>
+                                            </tr>
+                                            <tr>
+                                                <td>TCS</td>
+                                                <td>5</td>
+                                                <td>₹3,400.00</td>
+                                                <td>₹3,600.25</td>
+                                                <td class="text-success">₹1,001.25</td>
+                                                <td class="text-success">5.89%</td>
+                                                <td><span class="badge bg-success">Positive</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Sentiment & Optimization Details -->
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-chat-square-text me-2"></i>Sentiment Analysis
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-4">
+                                    <h6 class="mb-3">Overall Sentiment</h6>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <div class="progress flex-grow-1 me-3" style="height: 8px;">
+                                            <div id="overallSentimentBar" class="progress-bar bg-success" role="progressbar" style="width: 65%"></div>
+                                        </div>
+                                        <span id="overallSentimentValue" class="text-success fw-bold">0.65</span>
+                                    </div>
+                                    <div class="small text-muted">
+                                        Confidence: <span id="sentimentConfidence">0.82</span>
+                                    </div>
+                                </div>
+                                
+                                <h6 class="mb-3">Symbol Sentiment</h6>
+                                <div id="symbolSentiment">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>RELIANCE</div>
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress mx-2" style="width: 100px; height: 6px;">
+                                                <div class="progress-bar bg-success" role="progressbar" style="width: 75%"></div>
+                                            </div>
+                                            <span class="text-success">0.75</span>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>HDFCBANK</div>
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress mx-2" style="width: 100px; height: 6px;">
+                                                <div class="progress-bar bg-danger" role="progressbar" style="width: 35%"></div>
+                                            </div>
+                                            <span class="text-danger">-0.35</span>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>TCS</div>
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress mx-2" style="width: 100px; height: 6px;">
+                                                <div class="progress-bar bg-success" role="progressbar" style="width: 80%"></div>
+                                            </div>
+                                            <span class="text-success">0.80</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-light">
+                                <h5 class="card-title mb-0">
+                                    <i class="bi bi-magic me-2"></i>Optimization Factors
+                                </h5>
+                            </div>
+                            <div class="card-body" id="optimizationFactors">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>Base Reduction</div>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress mx-2" style="width: 100px; height: 6px;">
+                                            <div class="progress-bar" role="progressbar" style="width: 50%"></div>
+                                        </div>
+                                        <span>5%</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>Volatility Impact</div>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress mx-2" style="width: 100px; height: 6px;">
+                                            <div class="progress-bar" role="progressbar" style="width: 45%"></div>
+                                        </div>
+                                        <span>4.5%</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>Index Factor</div>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress mx-2" style="width: 100px; height: 6px;">
+                                            <div class="progress-bar" role="progressbar" style="width: 30%"></div>
+                                        </div>
+                                        <span>3%</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>Sentiment Impact</div>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress mx-2" style="width: 100px; height: 6px;">
+                                            <div class="progress-bar" role="progressbar" style="width: 55%"></div>
+                                        </div>
+                                        <span>5.5%</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>Correlation Impact</div>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress mx-2" style="width: 100px; height: 6px;">
+                                            <div class="progress-bar" role="progressbar" style="width: 20%"></div>
+                                        </div>
+                                        <span>2%</span>
+                                    </div>
+                                </div>
+                                
+                                <hr>
+                                
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="fw-bold">Total Reduction</div>
+                                    <div class="fw-bold">20%</div>
+                                </div>
+                                
+                                <div class="mt-3 text-end">
+                                    <span class="badge bg-secondary">Confidence: 65%</span>
+                                    <span class="badge bg-info ms-2">Rule-based</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Broker Connection Modal -->
+    <div class="modal fade" id="connectBrokerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Connect Broker</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="brokerConnectionForm">
+                        <div class="mb-3">
+                            <label class="form-label">Select Broker</label>
+                            <select class="form-select" id="brokerSelect" required>
+                                <option value="">-- Select Broker --</option>
+                                <option value="icici">ICICI Direct</option>
+                                <option value="kotak">Kotak Securities</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">User ID</label>
+                            <input type="text" class="form-control" id="userId" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" required>
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="rememberCredentials">
+                            <label class="form-check-label" for="rememberCredentials">Remember my credentials</label>
+                        </div>
+                        <div class="alert alert-info" role="alert">
+                            <small>
+                                <i class="bi bi-info-circle me-2"></i>
+                                We only request <strong>read-only</strong> access to fetch your portfolio data.
+                            </small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="connectBrokerSubmitBtn">Connect</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
