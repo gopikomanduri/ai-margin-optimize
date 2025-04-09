@@ -6,8 +6,8 @@ console.log(`Debug: Anthropic API key format check - prefix: ${apiKeyPrefix}`);
 
 // the newest Anthropic model is "claude-3-7-sonnet-20250219" which was released February 24, 2025
 const anthropic = new Anthropic({
-  // Try to directly use the API key here (for testing purposes)
-  apiKey: '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',
+  // Use environment variable for API key
+  apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 interface AIResponse {
