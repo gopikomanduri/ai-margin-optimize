@@ -1,0 +1,25 @@
+[AI Margin Optimizer Dashboard]
+
+The dashboard is organized into several key sections:
+
+1. Left Sidebar:
+   - Account Summary with Available Margin (₹150,000), Used Margin (₹350,000), and Total Margin (₹500,000)
+   - Optimization Summary showing Current Margin (₹350,000), Optimized Margin (₹280,000), and potential savings of ₹70,000 (20% reduction)
+   - Latest News section with updates about portfolio holdings (RELIANCE, HDFCBANK, TCS)
+
+2. Main Content Area:
+   - Market Overview with real-time indices:
+     * NIFTY 50: 22,502.00 (+0.67%)
+     * BANK NIFTY: 47,380.45 (-0.25%)
+     * SENSEX: 73,968.70 (+0.58%)
+   - Macro indicators (INR/USD, Crude Oil, Gold, VIX)
+   - Portfolio & F&O Positions tabs showing current holdings and futures/options positions
+   - Sentiment Analysis section with overall sentiment score (0.65, positive) and individual symbol sentiment
+   - Optimization Factors breakdown showing how the 20% margin reduction was calculated
+
+3. Top Navigation:
+   - Dashboard, Portfolio, News, and Analysis links
+   - Connect Broker button
+   - User profile menu
+
+The interface is clean with a blue/white professional color scheme, responsive layout, and interactive elements like charts and progress bars.
