@@ -1,5 +1,14 @@
 {pkgs}: {
   deps = [
+    pkgs.ffmpeg
+    pkgs.zip
+    pkgs.openjpeg
+    pkgs.libxcrypt
+    pkgs.libwebp
+    pkgs.libtiff
+    pkgs.libjpeg
+    pkgs.libimagequant
+    pkgs.lcms2
     pkgs.zlib
     pkgs.xcodebuild
     pkgs.tk

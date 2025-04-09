@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Margin Optimizer Demo</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/demo.css">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row header">
+            <div class="col-12 text-center py-4">
+                <h1>AI Margin Optimizer for F&O Large Traders</h1>
+                <p class="lead">Reduce over-pledging of collateral by 20-30% using AI-powered optimization</p>
+            </div>
+        </div>
+
+        <div class="row dashboard">
+            <!-- Account Summary -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5>Account Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Account Value:</span>
+                            <span class="fw-bold" id="account-value">₹0</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Current Margin:</span>
+                            <span class="fw-bold" id="current-margin">₹0</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Optimized Margin:</span>
+                            <span class="fw-bold text-success" id="optimized-margin">₹0</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Potential Savings:</span>
+                            <span class="fw-bold text-success" id="potential-savings">₹0</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Reduction %:</span>
+                            <span class="fw-bold text-success" id="reduction-percent">0%</span>
+                        </div>
+                        <div class="mt-4">
+                            <div class="progress">
+                                <div id="confidence-bar" class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <div class="text-center mt-2">
+                                <small>AI Confidence: <span id="confidence-value">0%</span></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button id="optimize-btn" class="btn btn-primary w-100">Optimize Margin</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Optimization Factors -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5>Optimization Factors</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="factors-chart"></canvas>
+                        <div class="mt-4">
+                            <p class="text-muted small">These factors are analyzed by our AI model to determine optimal margin requirements</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sentiment Analysis -->
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5>News Sentiment</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="sentiment-chart"></canvas>
+                        <div id="sentiment-details" class="mt-3">
+                            <!-- Sentiment details will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Market Overview -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5>Market Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Index</th>
+                                        <th>Value</th>
+                                        <th>Change</th>
+                                        <th>% Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="market-data">
+                                    <!-- Market data will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Holdings -->
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5>Portfolio Holdings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th>Quantity</th>
+                                        <th>Value</th>
+                                        <th>Sentiment</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="holdings-data">
+                                    <!-- Holdings data will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- News Section -->
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Recent News</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="news-container" class="row">
+                            <!-- News data will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Optimization History -->
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Optimization History</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Current Margin</th>
+                                        <th>Optimized Margin</th>
+                                        <th>Reduction %</th>
+                                        <th>Confidence</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-data">
+                                    <!-- History data will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer mt-auto py-3 bg-light">
+        <div class="container text-center">
+            <span class="text-muted">© 2025 AI Margin Optimizer. For demonstration purposes only.</span>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JavaScript -->
+    <script src="/static/js/demo.js"></script>
+</body>
+</html>

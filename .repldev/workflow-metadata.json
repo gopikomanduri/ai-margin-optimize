@@ -1,0 +1,14 @@
+{
+  "workflows": [
+    {
+      "name": "Start application",
+      "description": "Run the original JavaScript/Node backend",
+      "command": "npm run dev"
+    },
+    {
+      "name": "AI Margin Optimizer Demo",
+      "description": "Run the AI Margin Optimizer demo application",
+      "command": "python demo.py"
+    }
+  ]
+}
