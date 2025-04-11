@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BrokerLogin } from "@/components/BrokerLogin";
+import { PortfolioSummary } from "@/components/PortfolioSummary";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { SiZerodha } from "react-icons/si";
-import { FaCheck, FaTimes, FaExchangeAlt, FaPlus, FaSync } from "react-icons/fa";
+import { FaCheck, FaTimes, FaExchangeAlt, FaPlus, FaSync, FaBriefcase, FaChartLine } from "react-icons/fa";
 
 type BrokerInfo = {
   id: number;
@@ -63,8 +65,10 @@ export default function BrokerConnectionPage() {
     switch (broker.toLowerCase()) {
       case 'zerodha':
         return <SiZerodha className="h-6 w-6" />;
+      case 'fyers':
+        return <span className="font-bold text-lg text-green-600">F</span>;
       case 'angel':
-        return <span className="font-bold text-lg">A</span>;
+        return <span className="font-bold text-lg text-red-600">A</span>;
       default:
         return <FaExchangeAlt className="h-6 w-6" />;
     }
@@ -105,6 +109,9 @@ export default function BrokerConnectionPage() {
       </div>
     );
   }
+  
+  // Track the selected connection for viewing portfolio
+  const [selectedConnection, setSelectedConnection] = useState<number | null>(null);
   
   return (
     <div className="container max-w-6xl mx-auto py-8">
@@ -150,71 +157,111 @@ export default function BrokerConnectionPage() {
       ) : null}
       
       {connections && connections.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {connections.map((connection: BrokerInfo) => (
-            <Card key={connection.id} className="overflow-hidden">
-              <CardHeader className="pb-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                      {getBrokerIcon(connection.broker)}
-                    </div>
-                    <div>
-                      <CardTitle>{connection.broker}</CardTitle>
-                      <CardDescription>
-                        {connection.metadata?.accountId || "Account connected"}
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <Badge className={getStatusColor(connection.isActive)}>
-                    {connection.isActive ? (
-                      <><FaCheck className="mr-1 h-3 w-3" /> Active</>
-                    ) : (
-                      <><FaTimes className="mr-1 h-3 w-3" /> Inactive</>
-                    )}
-                  </Badge>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="pb-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-gray-500 dark:text-gray-400">Account Name</p>
-                    <p>{connection.metadata?.name || "Not available"}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 dark:text-gray-400">Email</p>
-                    <p>{connection.metadata?.email || "Not available"}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 dark:text-gray-400">Last Updated</p>
-                    <p>{new Date(connection.lastUpdated).toLocaleString()}</p>
-                  </div>
-                </div>
-              </CardContent>
-              
-              <CardFooter className="pt-0 flex justify-between">
+        <>
+          {selectedConnection !== null ? (
+            // Show portfolio for the selected connection
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <FaBriefcase className="text-primary" />
+                  <span>
+                    {connections.find(c => c.id === selectedConnection)?.broker} Portfolio
+                  </span>
+                </h2>
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => refetch()}
-                  className="flex items-center gap-1"
+                  onClick={() => setSelectedConnection(null)}
                 >
-                  <FaSync className="h-3 w-3" />
-                  <span>Refresh</span>
+                  Back to Connections
                 </Button>
-                
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => handleDisconnect(connection.id)}
-                >
-                  Disconnect
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
+              </div>
+              
+              <PortfolioSummary 
+                broker={connections.find(c => c.id === selectedConnection)?.broker || ''} 
+                brokerId={selectedConnection} 
+              />
+            </div>
+          ) : (
+            // Show the list of connections
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {connections.map((connection: BrokerInfo) => (
+                <Card key={connection.id} className="overflow-hidden">
+                  <CardHeader className="pb-4">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                          {getBrokerIcon(connection.broker)}
+                        </div>
+                        <div>
+                          <CardTitle>{connection.broker}</CardTitle>
+                          <CardDescription>
+                            {connection.metadata?.accountId || "Account connected"}
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <Badge className={getStatusColor(connection.isActive)}>
+                        {connection.isActive ? (
+                          <><FaCheck className="mr-1 h-3 w-3" /> Active</>
+                        ) : (
+                          <><FaTimes className="mr-1 h-3 w-3" /> Inactive</>
+                        )}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="pb-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-500 dark:text-gray-400">Account Name</p>
+                        <p>{connection.metadata?.name || "Not available"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 dark:text-gray-400">Email</p>
+                        <p>{connection.metadata?.email || "Not available"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 dark:text-gray-400">Last Updated</p>
+                        <p>{new Date(connection.lastUpdated).toLocaleString()}</p>
+                      </div>
+                    </div>
+                    
+                    {connection.isActive && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-4 flex items-center justify-center gap-2"
+                        onClick={() => setSelectedConnection(connection.id)}
+                      >
+                        <FaChartLine className="h-4 w-4" />
+                        <span>View Portfolio</span>
+                      </Button>
+                    )}
+                  </CardContent>
+                  
+                  <CardFooter className="pt-0 flex justify-between">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => refetch()}
+                      className="flex items-center gap-1"
+                    >
+                      <FaSync className="h-3 w-3" />
+                      <span>Refresh</span>
+                    </Button>
+                    
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => handleDisconnect(connection.id)}
+                    >
+                      Disconnect
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       ) : (
         <Card className="mb-8">
           <CardContent className="py-8">

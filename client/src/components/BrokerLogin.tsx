@@ -29,14 +29,22 @@ export function BrokerLogin({ onLoginSuccess }: BrokerLoginProps) {
     totp: "",
   });
   
+  const [fyersCredentials, setFyersCredentials] = useState({
+    username: "",
+    password: "",
+    pin: "",
+  });
+  
   const [loading, setLoading] = useState({
     zerodha: false,
-    angel: false
+    angel: false,
+    fyers: false
   });
   
   const [step, setStep] = useState({
     zerodha: 1, // 1 = username/password, 2 = PIN
-    angel: 1    // 1 = username/password, 2 = TOTP
+    angel: 1,   // 1 = username/password, 2 = TOTP
+    fyers: 1    // 1 = username/password, 2 = PIN
   });
   
   const { toast } = useToast();
@@ -50,6 +58,11 @@ export function BrokerLogin({ onLoginSuccess }: BrokerLoginProps) {
   const handleAngelCredentialsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setAngelCredentials((prev) => ({ ...prev, [name]: value }));
+  };
+  
+  const handleFyersCredentialsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFyersCredentials((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleZerodhaLogin = async (e: React.FormEvent) => {
@@ -175,6 +188,68 @@ export function BrokerLogin({ onLoginSuccess }: BrokerLoginProps) {
       setLoading({ ...loading, angel: false });
     }
   };
+  
+  const handleFyersLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      setLoading({ ...loading, fyers: true });
+      
+      if (step.fyers === 1) {
+        // First step - username and password
+        const response = await apiRequest("/api/broker/fyers/auth", {
+          method: "POST",
+          body: JSON.stringify({
+            username: fyersCredentials.username,
+            password: fyersCredentials.password,
+          }),
+        });
+        
+        if (response.success) {
+          // Move to PIN step
+          setStep({ ...step, fyers: 2 });
+          toast({
+            title: "Authentication Step 1 Complete",
+            description: "Please enter your FYERS PIN to complete login.",
+          });
+        } else {
+          throw new Error(response.message || "Failed to authenticate with FYERS");
+        }
+      } else {
+        // Second step - PIN verification
+        const response = await apiRequest("/api/broker/fyers/verify", {
+          method: "POST",
+          body: JSON.stringify({
+            username: fyersCredentials.username,
+            pin: fyersCredentials.pin,
+          }),
+        });
+        
+        if (response.success) {
+          toast({
+            title: "Login Successful",
+            description: "You have successfully connected to your FYERS account.",
+          });
+          
+          if (onLoginSuccess) {
+            onLoginSuccess();
+          } else {
+            setLocation("/");
+          }
+        } else {
+          throw new Error(response.message || "Failed to verify PIN");
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "Login Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading({ ...loading, fyers: false });
+    }
+  };
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -187,10 +262,13 @@ export function BrokerLogin({ onLoginSuccess }: BrokerLoginProps) {
       
       <CardContent>
         <Tabs defaultValue="zerodha" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="zerodha" className="flex items-center gap-2">
               <SiZerodha className="h-4 w-4" />
               <span>Zerodha</span>
+            </TabsTrigger>
+            <TabsTrigger value="fyers" className="flex items-center gap-2">
+              <span className="font-bold text-sm">FYERS</span>
             </TabsTrigger>
             <TabsTrigger value="angel" className="flex items-center gap-2">
               <span className="font-bold text-sm">Angel</span>
@@ -266,6 +344,79 @@ export function BrokerLogin({ onLoginSuccess }: BrokerLoginProps) {
                   "Continue"
                 ) : (
                   "Connect Zerodha Account"
+                )}
+              </Button>
+            </form>
+          </TabsContent>
+          
+          {/* FYERS Login Form */}
+          <TabsContent value="fyers">
+            <form onSubmit={handleFyersLogin} className="space-y-4 pt-4">
+              {step.fyers === 1 ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="fyers-username">FYERS Client ID</Label>
+                    <div className="relative">
+                      <FaUserAlt className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="fyers-username"
+                        name="username"
+                        placeholder="XY00000"
+                        className="pl-10"
+                        value={fyersCredentials.username}
+                        onChange={handleFyersCredentialsChange}
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="fyers-password">Password</Label>
+                    <div className="relative">
+                      <FaKey className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="fyers-password"
+                        name="password"
+                        type="password"
+                        className="pl-10"
+                        value={fyersCredentials.password}
+                        onChange={handleFyersCredentialsChange}
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="fyers-pin">FYERS PIN</Label>
+                  <Input
+                    id="fyers-pin"
+                    name="pin"
+                    type="password"
+                    placeholder="Enter your FYERS PIN"
+                    value={fyersCredentials.pin}
+                    onChange={handleFyersCredentialsChange}
+                    required
+                    maxLength={6}
+                    pattern="[0-9]{6}"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Please enter the security PIN for your FYERS account
+                  </p>
+                </div>
+              )}
+              
+              <Button 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+                disabled={loading.fyers}
+              >
+                {loading.fyers ? (
+                  "Connecting..."
+                ) : step.fyers === 1 ? (
+                  "Continue"
+                ) : (
+                  "Connect FYERS Account"
                 )}
               </Button>
             </form>
