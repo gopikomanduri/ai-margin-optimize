@@ -9,6 +9,10 @@ import Alerts from "@/pages/Alerts";
 import BrokerConnection from "@/pages/BrokerConnection";
 import MarginOptimizer from "@/pages/MarginOptimizer";
 import AuthPage from "@/pages/auth-page";
+import Markets from "@/pages/Markets";
+import Portfolio from "@/pages/Portfolio";
+import History from "@/pages/History";
+import Settings from "@/pages/Settings";
 
 import Navbar from "@/components/Navbar";
 import { AlertNotifications } from "@/components/AlertNotifications";
@@ -34,6 +38,10 @@ function Router() {
           <ProtectedRoute path="/alerts" component={Alerts} />
           <ProtectedRoute path="/broker" component={BrokerConnection} />
           <ProtectedRoute path="/margin-optimizer" component={MarginOptimizer} />
+          <ProtectedRoute path="/markets" component={Markets} />
+          <ProtectedRoute path="/portfolio" component={Portfolio} />
+          <ProtectedRoute path="/history" component={History} />
+          <ProtectedRoute path="/settings" component={Settings} />
           <Route path="/auth" component={AuthPage} />
           <Route component={NotFound} />
         </Switch>
