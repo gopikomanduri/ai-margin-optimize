@@ -13,7 +13,18 @@ import { getTechnicalAnalysis } from "./services/technicalAnalysis";
 import { getCorporateActions } from "./services/corporateActions";
 import { getMarketData } from "./services/marketData";
 import { getAnthropicCompletion } from "./services/anthropic";
-import { connectBroker, completeBrokerAuth, getBrokerData, BrokerType } from "./services/broker";
+import { 
+  connectBroker, 
+  completeBrokerAuth, 
+  getBrokerData, 
+  BrokerType,
+  getPledgedHoldings,
+  getMarginOptimizationRecommendations,
+  createPledgeRequest,
+  createUnpledgeRequest,
+  requestPledgeOTP,
+  authorizePledgeRequest
+} from "./services/broker";
 import { InsertBrokerConnection, InsertTradingGoal } from "@shared/schema";
 import { saveToMemory, retrieveFromMemory } from "./services/mcp";
 import { seedBadgeDefinitions } from "./services/badgeService";
@@ -434,6 +445,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         message: "Failed to authorize broker: " + error.message
       });
+    }
+  });
+  
+  // Get pledged holdings
+  app.get("/api/pledged-holdings", async (req: Request, res: Response) => {
+    try {
+      const pledgedHoldings = await getPledgedHoldings(DEFAULT_USER_ID);
+      res.status(200).json(pledgedHoldings);
+    } catch (error) {
+      console.error("Error getting pledged holdings:", error);
+      res.status(500).send(`Failed to get pledged holdings: ${error.message}`);
+    }
+  });
+  
+  // Get margin optimization recommendations
+  app.get("/api/margin-optimization", async (req: Request, res: Response) => {
+    try {
+      const optimizationRecommendations = await getMarginOptimizationRecommendations(DEFAULT_USER_ID);
+      res.status(200).json(optimizationRecommendations);
+    } catch (error) {
+      console.error("Error getting margin optimization recommendations:", error);
+      res.status(500).send(`Failed to get margin optimization recommendations: ${error.message}`);
+    }
+  });
+  
+  // Create a pledge request
+  app.post("/api/pledge", async (req: Request, res: Response) => {
+    try {
+      const { broker, symbol, quantity, purpose } = req.body;
+      
+      // Validate pledge parameters
+      if (!broker || !symbol || !quantity) {
+        return res.status(400).send("Missing required pledge parameters");
+      }
+      
+      const result = await createPledgeRequest(DEFAULT_USER_ID, {
+        broker,
+        symbol,
+        quantity,
+        purpose
+      });
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Error creating pledge request:", error);
+      res.status(500).send(`Failed to create pledge request: ${error.message}`);
+    }
+  });
+  
+  // Create an unpledge request
+  app.post("/api/unpledge", async (req: Request, res: Response) => {
+    try {
+      const { broker, symbol, quantity, pledgeId, purpose } = req.body;
+      
+      // Validate unpledge parameters
+      if (!broker || !symbol || !quantity) {
+        return res.status(400).send("Missing required unpledge parameters");
+      }
+      
+      const result = await createUnpledgeRequest(DEFAULT_USER_ID, {
+        broker,
+        symbol,
+        quantity,
+        pledgeId,
+        purpose
+      });
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Error creating unpledge request:", error);
+      res.status(500).send(`Failed to create unpledge request: ${error.message}`);
+    }
+  });
+  
+  // Request OTP for pledge authorization
+  app.post("/api/pledge/request-otp", async (req: Request, res: Response) => {
+    try {
+      const { broker, requestId, requestType } = req.body;
+      
+      // Validate OTP request parameters
+      if (!broker || !requestId || !requestType) {
+        return res.status(400).send("Missing required OTP request parameters");
+      }
+      
+      const result = await requestPledgeOTP(DEFAULT_USER_ID, {
+        broker,
+        requestId,
+        requestType
+      });
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Error requesting OTP:", error);
+      res.status(500).send(`Failed to request OTP: ${error.message}`);
+    }
+  });
+  
+  // Authorize pledge with OTP
+  app.post("/api/pledge/authorize", async (req: Request, res: Response) => {
+    try {
+      const { broker, requestId, requestType, otp } = req.body;
+      
+      // Validate authorization parameters
+      if (!broker || !requestId || !requestType || !otp) {
+        return res.status(400).send("Missing required authorization parameters");
+      }
+      
+      const result = await authorizePledgeRequest(DEFAULT_USER_ID, {
+        broker,
+        requestId,
+        requestType,
+        otp
+      });
+      
+      if (result.success) {
+        res.status(200).json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Error authorizing request:", error);
+      res.status(500).send(`Failed to authorize request: ${error.message}`);
     }
   });
   

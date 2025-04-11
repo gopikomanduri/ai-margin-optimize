@@ -7,6 +7,7 @@ import Home from "@/pages/Home";
 import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
 import Alerts from "@/pages/Alerts";
 import BrokerConnection from "@/pages/BrokerConnection";
+import MarginOptimizer from "@/pages/MarginOptimizer";
 import AuthPage from "@/pages/auth-page";
 
 import Navbar from "@/components/Navbar";
@@ -32,6 +33,7 @@ function Router() {
           <ProtectedRoute path="/advanced-analytics" component={AdvancedAnalytics} />
           <ProtectedRoute path="/alerts" component={Alerts} />
           <ProtectedRoute path="/broker" component={BrokerConnection} />
+          <ProtectedRoute path="/margin-optimizer" component={MarginOptimizer} />
           <Route path="/auth" component={AuthPage} />
           <Route component={NotFound} />
         </Switch>
