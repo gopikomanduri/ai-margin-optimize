@@ -7,26 +7,32 @@ import Home from "@/pages/Home";
 import AdvancedAnalytics from "@/pages/AdvancedAnalytics";
 import Alerts from "@/pages/Alerts";
 import BrokerConnection from "@/pages/BrokerConnection";
+import AuthPage from "@/pages/auth-page";
 
 import Navbar from "@/components/Navbar";
 import { AlertNotifications } from "@/components/AlertNotifications";
 import { VoiceProvider } from "./contexts/VoiceContext";
 import VoiceTranscriptDisplay from "@/components/VoiceTranscriptDisplay";
 import useKeyboardShortcuts from "@/hooks/useKeyboardShortcuts";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 function Router() {
   // Enable keyboard shortcuts
   useKeyboardShortcuts();
   
+  // Get authentication status
+  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  
   return (
     <>
-      <Navbar />
+      {isLoggedIn && <Navbar />}
       <main className="flex-1">
         <Switch>
-          <Route path="/" component={Home} />
-          <Route path="/advanced-analytics" component={AdvancedAnalytics} />
-          <Route path="/alerts" component={Alerts} />
-          <Route path="/broker" component={BrokerConnection} />
+          <ProtectedRoute path="/" component={Home} />
+          <ProtectedRoute path="/advanced-analytics" component={AdvancedAnalytics} />
+          <ProtectedRoute path="/alerts" component={Alerts} />
+          <ProtectedRoute path="/broker" component={BrokerConnection} />
+          <Route path="/auth" component={AuthPage} />
           <Route component={NotFound} />
         </Switch>
       </main>

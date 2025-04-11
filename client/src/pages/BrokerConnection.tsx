@@ -133,7 +133,7 @@ export default function BrokerConnectionPage() {
             <CardHeader>
               <CardTitle>Connect New Broker</CardTitle>
               <CardDescription>
-                Add a new broker connection to enable automated trading
+                Add a new broker connection to enable AI-powered margin optimization
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -268,7 +268,7 @@ export default function BrokerConnectionPage() {
             <div className="text-center">
               <p className="text-xl mb-4">No broker connections found</p>
               <p className="text-gray-500 dark:text-gray-400 mb-6">
-                Connect to your preferred trading broker to start automated trading
+                Connect to your preferred trading broker to start optimizing your margin requirements
               </p>
               <Button 
                 onClick={() => setShowLoginForm(true)}

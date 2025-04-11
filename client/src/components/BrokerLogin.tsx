@@ -256,7 +256,7 @@ export function BrokerLogin({ onLoginSuccess }: BrokerLoginProps) {
       <CardHeader>
         <CardTitle className="text-2xl text-center">Connect Your Broker</CardTitle>
         <CardDescription className="text-center">
-          Connect your trading account to enable automated trading
+          Connect your trading account to enable AI-powered margin optimization
         </CardDescription>
       </CardHeader>
       
@@ -501,7 +501,7 @@ export function BrokerLogin({ onLoginSuccess }: BrokerLoginProps) {
           Your login credentials are securely transmitted to your broker. We do not store your password or PIN.
         </p>
         <p className="text-xs text-center text-gray-500">
-          By connecting your account, you allow TradeMind to place trades on your behalf according to your strategy settings.
+          By connecting your account, you allow AI Margin Optimizer to analyze your portfolio and optimize margin requirements based on market conditions.
         </p>
       </CardFooter>
     </Card>

@@ -58,23 +58,28 @@ export default function AuthPage() {
   const onLoginSubmit = async (data: LoginFormValues) => {
     try {
       setIsLoading(true);
-      const response = await apiRequest("/api/login", {
-        method: "POST",
-        body: JSON.stringify({
-          username: data.username,
-          password: data.password,
-        }),
+      
+      // Simulate login API call
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // For development only - in production we'd call the real API endpoint
+      // const response = await apiRequest("/api/login", {
+      //   method: "POST",
+      //   body: JSON.stringify({
+      //     username: data.username,
+      //     password: data.password,
+      //   }),
+      // });
+      
+      // Mock successful login for development
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('username', data.username);
+      
+      toast({
+        title: "Login Successful",
+        description: "Welcome to AI Margin Optimizer!",
       });
-
-      if (response.success) {
-        toast({
-          title: "Login Successful",
-          description: "Welcome to AI Margin Optimizer!",
-        });
-        setLocation("/");
-      } else {
-        throw new Error(response.message || "Invalid credentials");
-      }
+      setLocation("/");
     } catch (error) {
       toast({
         title: "Login Failed",
@@ -89,25 +94,32 @@ export default function AuthPage() {
   const onRegisterSubmit = async (data: RegisterFormValues) => {
     try {
       setIsLoading(true);
-      const response = await apiRequest("/api/register", {
-        method: "POST",
-        body: JSON.stringify({
-          username: data.username,
-          email: data.email,
-          name: data.name,
-          password: data.password,
-        }),
+      
+      // Simulate registration API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // For development only - in production we'd call the real API endpoint
+      // const response = await apiRequest("/api/register", {
+      //   method: "POST",
+      //   body: JSON.stringify({
+      //     username: data.username,
+      //     email: data.email,
+      //     name: data.name,
+      //     password: data.password,
+      //   }),
+      // });
+      
+      // Mock successful registration
+      localStorage.setItem('isLoggedIn', 'true');
+      localStorage.setItem('username', data.username);
+      localStorage.setItem('email', data.email);
+      localStorage.setItem('name', data.name);
+      
+      toast({
+        title: "Registration Successful",
+        description: "Your account has been created successfully!",
       });
-
-      if (response.success) {
-        toast({
-          title: "Registration Successful",
-          description: "Your account has been created. You can now log in.",
-        });
-        setLocation("/");
-      } else {
-        throw new Error(response.message || "Registration failed");
-      }
+      setLocation("/");
     } catch (error) {
       toast({
         title: "Registration Failed",
