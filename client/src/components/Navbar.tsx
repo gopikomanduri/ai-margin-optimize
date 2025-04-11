@@ -47,16 +47,18 @@ export default function Navbar() {
           
           <div className="flex items-center space-x-1">
             {navItems.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <a className={`px-3 py-2 rounded-md text-sm flex items-center space-x-1 transition-colors
-                  ${location === item.href 
-                    ? "bg-primary text-primary-foreground" 
-                    : "hover:bg-muted hover:text-foreground"}`}
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span>{item.label}</span>
-                </a>
-              </Link>
+              <div key={item.href} className="inline-block">
+                <Link href={item.href}>
+                  <Button
+                    variant={location === item.href ? "default" : "ghost"}
+                    size="sm"
+                    className="flex items-center space-x-1"
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Button>
+                </Link>
+              </div>
             ))}
             
             <div className="ml-2 flex items-center space-x-2">
