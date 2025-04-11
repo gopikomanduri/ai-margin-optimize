@@ -1,6 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import Header from "@/components/Header";
-import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Filter } from "lucide-react";
@@ -8,11 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default function History() {
-  // Fetch user profile
-  const { data: userProfile, isLoading: isLoadingUser } = useQuery({
-    queryKey: ['/api/user/profile'],
-  });
-
   // Define history type
   type HistoryItem = {
     id: number;
@@ -31,21 +24,21 @@ export default function History() {
     queryKey: ['/api/history'],
   });
   
-  const isLoading = isLoadingUser || isLoadingHistory;
+  const isLoading = isLoadingHistory;
 
-  // Get status badge color based on status
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'success';
-      case 'pending':
-        return 'warning';
-      case 'failed':
-        return 'destructive';
-      default:
-        return 'secondary';
-    }
-  };
+  // No longer using this function as we're using custom colors via className
+  // const getStatusBadgeVariant = (status: string) => {
+  //   switch (status) {
+  //     case 'completed':
+  //       return 'success';
+  //     case 'pending':
+  //       return 'warning';
+  //     case 'failed':
+  //       return 'destructive';
+  //     default:
+  //       return 'secondary';
+  //   }
+  // };
 
   // Format timestamp to readable date
   const formatTimestamp = (timestamp: string) => {
@@ -76,90 +69,88 @@ export default function History() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <Header userProfile={userProfile} isLoading={isLoadingUser} />
-      <div className="flex flex-1">
-        <Navbar />
-        <main className="flex-1 py-6">
-          <div className="container">
-            <div className="mb-6">
-              <h1 className="text-3xl font-bold tracking-tight mb-4">History</h1>
-              <p className="text-muted-foreground">
-                Track your past activities, trades, margin optimizations, and account changes.
-              </p>
-            </div>
+    <div className="p-6">
+      <div className="container">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold tracking-tight mb-4">History</h1>
+          <p className="text-muted-foreground">
+            Track your past activities, trades, margin optimizations, and account changes.
+          </p>
+        </div>
 
-            {isLoading ? (
-              <div className="flex justify-center items-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Activity History</CardTitle>
-                    <Button variant="outline" size="sm" className="gap-1">
-                      <Filter className="h-4 w-4" /> Filter
-                    </Button>
-                  </div>
-                  <CardDescription>
-                    A comprehensive log of all your platform activities and transactions
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date & Time</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Details</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {historyData?.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{formatTimestamp(item.timestamp)}</TableCell>
-                          <TableCell>{getTypeBadge(item.type)}</TableCell>
-                          <TableCell>{item.description}</TableCell>
-                          <TableCell>
-                            {item.symbol && (
-                              <div className="text-sm">
-                                {item.symbol}{' '}
-                                {item.quantity && `× ${item.quantity}`}{' '}
-                                {item.price && `@ ₹${item.price.toLocaleString()}`}
-                              </div>
-                            )}
-                            {item.amount && (
-                              <div className="text-sm">
-                                Amount: ₹{item.amount.toLocaleString()}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getStatusBadgeVariant(item.status)}>
-                              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      
-                      {/* Show empty state if no data */}
-                      {historyData?.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                            No history data available
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            )}
+        {isLoading ? (
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        </main>
+        ) : (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Activity History</CardTitle>
+                <Button variant="outline" size="sm" className="gap-1">
+                  <Filter className="h-4 w-4" /> Filter
+                </Button>
+              </div>
+              <CardDescription>
+                A comprehensive log of all your platform activities and transactions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {historyData?.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>{formatTimestamp(item.timestamp)}</TableCell>
+                      <TableCell>{getTypeBadge(item.type)}</TableCell>
+                      <TableCell>{item.description}</TableCell>
+                      <TableCell>
+                        {item.symbol && (
+                          <div className="text-sm">
+                            {item.symbol}{' '}
+                            {item.quantity && `× ${item.quantity}`}{' '}
+                            {item.price && `@ ₹${item.price.toLocaleString()}`}
+                          </div>
+                        )}
+                        {item.amount && (
+                          <div className="text-sm">
+                            Amount: ₹{item.amount.toLocaleString()}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`
+                          ${item.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
+                          ${item.status === 'pending' ? 'bg-amber-100 text-amber-800' : ''}
+                          ${item.status === 'failed' ? 'bg-red-100 text-red-800' : ''}
+                        `}>
+                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  
+                  {/* Show empty state if no data */}
+                  {historyData?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No history data available
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
