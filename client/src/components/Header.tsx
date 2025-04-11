@@ -12,7 +12,9 @@ const Header = ({ userProfile, isLoading }: HeaderProps) => {
   
   const { mutate: shareAssistant } = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/share', {});
+      const response = await apiRequest('/api/share', {
+        method: 'POST'
+      });
       return response.json();
     },
     onSuccess: (data) => {
@@ -35,7 +37,7 @@ const Header = ({ userProfile, isLoading }: HeaderProps) => {
     <header className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between">
       <div className="flex items-center space-x-3">
         <div className="flex items-center">
-          <span className="text-primary-600 text-2xl font-bold">TradeMind</span>
+          <span className="text-primary-600 text-2xl font-bold">AI Margin Optimizer</span>
           <span className="text-slate-500 ml-2 text-xs border border-slate-200 rounded px-2 py-0.5">BETA</span>
         </div>
       </div>
@@ -48,7 +50,7 @@ const Header = ({ userProfile, isLoading }: HeaderProps) => {
           Share
         </button>
         <a 
-          href="https://github.com/yourusername/trademind-docs" 
+          href="https://github.com/yourusername/ai-margin-optimizer-docs" 
           target="_blank" 
           rel="noopener noreferrer"
           className="hidden sm:flex items-center gap-1 text-xs px-3 py-1.5 border border-success-500 rounded-md text-success-500 hover:bg-success-500/10"
