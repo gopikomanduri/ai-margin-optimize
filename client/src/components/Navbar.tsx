@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, BarChart2, Bell, Link2, LogOut, User } from "lucide-react";
+import { Home, BarChart2, Bell, Link2, LogOut, User, Calculator, TrendingUp } from "lucide-react";
 import VoiceCommandButton from "./VoiceCommandButton";
 import VoiceCommandHelp from "./VoiceCommandHelp";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ export default function Navbar() {
     { label: "Advanced Analytics", icon: BarChart2, href: "/advanced-analytics" },
     { label: "Alerts", icon: Bell, href: "/alerts" },
     { label: "Broker Connections", icon: Link2, href: "/broker" },
+    { label: "Margin Optimizer", icon: TrendingUp, href: "/margin-optimizer" },
   ];
   
   const handleLogout = () => {

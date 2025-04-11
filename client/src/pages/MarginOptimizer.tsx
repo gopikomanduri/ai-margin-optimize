@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Info, AlertTriangle, TrendingUp, Landmark, Percent } from "lucide-react";
+import { useLocation } from "wouter";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // Dashboard metrics for quick insights
@@ -38,8 +39,17 @@ export default function MarginOptimizer() {
     queryKey: ['/api/user/profile'],
   });
   
+  // Define broker connection status type
+  type BrokerConnectionStatus = {
+    success: boolean;
+    connected: boolean;
+    broker?: string;
+    status?: string;
+    message?: string;
+  };
+  
   // Get broker connection status
-  const { data: brokerConnection, isLoading: isLoadingBroker } = useQuery({
+  const { data: brokerConnection, isLoading: isLoadingBroker } = useQuery<BrokerConnectionStatus>({
     queryKey: ['/api/broker/zerodha/status'],
   });
   
@@ -48,7 +58,8 @@ export default function MarginOptimizer() {
   });
   
   const isLoading = isLoadingUser || isLoadingBroker || isLoadingMarket;
-  const isConnected = brokerConnection?.connected;
+  // Check if broker is successfully connected
+  const isConnected = brokerConnection ? (brokerConnection.success && brokerConnection.connected) : false;
   
   return (
     <div className="flex min-h-screen flex-col">

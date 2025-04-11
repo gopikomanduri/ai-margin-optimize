@@ -493,7 +493,7 @@ export const PledgedHoldings = () => {
                     <div key={idx} className="flex justify-between">
                       <span>{factor.factor}</span>
                       <Badge variant={
-                        factor.sentiment === "Positive" ? "success" : 
+                        factor.sentiment === "Positive" ? "default" : 
                         factor.sentiment === "Stable" ? "outline" : 
                         "destructive"
                       }>
