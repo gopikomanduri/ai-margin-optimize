@@ -373,6 +373,536 @@ export async function getBrokerData(
  * @param orderParams The order parameters
  * @returns Result of the order placement
  */
+/**
+ * Get pledged holdings for a user
+ * @param userId The user ID
+ * @returns List of pledged holdings
+ */
+export async function getPledgedHoldings(userId: number): Promise<any> {
+  try {
+    // Get active broker connections
+    const connections = await storage.getBrokerConnections(userId);
+    const activeConnections = connections.filter(conn => conn.isActive);
+    
+    if (activeConnections.length === 0) {
+      return {
+        pledgedStocks: [],
+        totalPledgedValue: 0,
+        marginAvailable: 0,
+        marginUtilized: 0
+      };
+    }
+    
+    // In a real implementation, this would make API calls to the broker
+    // Here we'll use mock data for demo purposes
+    const pledgedStocks = [
+      {
+        id: 1, 
+        symbol: "HDFCBANK", 
+        name: "HDFC Bank",
+        quantity: 150, 
+        pledgedQuantity: 120,
+        currentPrice: 1642.30,
+        pledgedValue: 197076.00,
+        haircut: 0.20, // 20% haircut value
+        marginAvailable: 157660.80, // 80% of pledged value
+        broker: activeConnections[0].broker,
+        lastUpdated: new Date().toISOString()
+      },
+      {
+        id: 2,
+        symbol: "RELIANCE", 
+        name: "Reliance Industries",
+        quantity: 80, 
+        pledgedQuantity: 70,
+        currentPrice: 2456.75,
+        pledgedValue: 171972.50,
+        haircut: 0.15, // 15% haircut value
+        marginAvailable: 146176.63, // 85% of pledged value
+        broker: activeConnections[0].broker,
+        lastUpdated: new Date().toISOString()
+      },
+      {
+        id: 3,
+        symbol: "INFY", 
+        name: "Infosys",
+        quantity: 200, 
+        pledgedQuantity: 180,
+        currentPrice: 1950.40,
+        pledgedValue: 351072.00,
+        haircut: 0.25, // 25% haircut value
+        marginAvailable: 263304.00, // 75% of pledged value
+        broker: activeConnections[0].broker,
+        lastUpdated: new Date().toISOString()
+      }
+    ];
+    
+    // Calculate totals
+    const totalPledgedValue = pledgedStocks.reduce((sum, stock) => sum + stock.pledgedValue, 0);
+    const totalMarginAvailable = pledgedStocks.reduce((sum, stock) => sum + stock.marginAvailable, 0);
+    const totalMarginUtilized = 340000; // Mock value for margin utilized
+    
+    // Log this event
+    await storage.createEventLog({
+      userId,
+      eventType: "pledged_holdings_fetched",
+      details: { 
+        broker: activeConnections[0].broker,
+        timestamp: new Date().toISOString(),
+        totalPledgedValue,
+        totalMarginAvailable,
+        totalMarginUtilized
+      }
+    });
+    
+    return {
+      pledgedStocks,
+      totalPledgedValue,
+      totalMarginAvailable,
+      totalMarginUtilized
+    };
+  } catch (error) {
+    console.error("Error getting pledged holdings:", error);
+    throw new Error(`Failed to get pledged holdings: ${error.message}`);
+  }
+}
+
+/**
+ * Get margin optimization recommendations
+ * @param userId The user ID
+ * @returns Optimization recommendations
+ */
+export async function getMarginOptimizationRecommendations(userId: number): Promise<any> {
+  try {
+    // Get active broker connections
+    const connections = await storage.getBrokerConnections(userId);
+    const activeConnections = connections.filter(conn => conn.isActive);
+    
+    if (activeConnections.length === 0) {
+      return {
+        recommendations: [],
+        potentialSavings: 0,
+        confidence: 0
+      };
+    }
+    
+    // Get pledged holdings
+    const pledgeData = await getPledgedHoldings(userId);
+    const pledgedStocks = pledgeData.pledgedStocks;
+    
+    if (!pledgedStocks || pledgedStocks.length === 0) {
+      return {
+        recommendations: [],
+        potentialSavings: 0,
+        confidence: 0
+      };
+    }
+    
+    // In a real implementation, this would run AI models to generate optimal
+    // recommendations. For demo purposes, we'll create mock recommendations.
+    const recommendations = [
+      {
+        stockId: 1,
+        symbol: "HDFCBANK",
+        name: "HDFC Bank",
+        currentPledgedQuantity: 120,
+        recommendedPledgedQuantity: 100,
+        quantityToUnpledge: 20,
+        currentPrice: 1642.30,
+        valueToFree: 32846.00,
+        priorityScore: 0.85,
+        reason: "Lower volatility and positive sentiment. Good time to reduce allocation.",
+      },
+      {
+        stockId: 3,
+        symbol: "INFY",
+        name: "Infosys",
+        currentPledgedQuantity: 180,
+        recommendedPledgedQuantity: 150,
+        quantityToUnpledge: 30,
+        currentPrice: 1950.40,
+        valueToFree: 58512.00,
+        priorityScore: 0.92,
+        reason: "Neutral sentiment and upcoming market events. Recommended to reduce exposure."
+      }
+    ];
+    
+    // Calculate potential savings and overall confidence
+    const potentialSavings = recommendations.reduce((sum, rec) => sum + rec.valueToFree, 0);
+    const averageConfidence = recommendations.reduce((sum, rec) => sum + rec.priorityScore, 0) / recommendations.length;
+    
+    // Include market factors that influenced the recommendation
+    const marketFactors = {
+      newsSentiment: {
+        HDFCBANK: 0.75, // Positive
+        INFY: 0.45,     // Neutral
+        RELIANCE: 0.65  // Slightly positive
+      },
+      volatilityMetrics: {
+        HDFCBANK: 0.18, // Low
+        INFY: 0.32,     // Medium
+        RELIANCE: 0.25  // Medium-low
+      },
+      macroFactors: [
+        { factor: "FII Flows", sentiment: "Positive", impact: "Medium" },
+        { factor: "USD/INR", sentiment: "Stable", impact: "Low" },
+        { factor: "Interest Rates", sentiment: "Negative", impact: "Medium" }
+      ]
+    };
+    
+    // Log this event
+    await storage.createEventLog({
+      userId,
+      eventType: "margin_optimization_generated",
+      details: { 
+        broker: activeConnections[0].broker,
+        timestamp: new Date().toISOString(),
+        recommendationCount: recommendations.length,
+        potentialSavings,
+        confidence: averageConfidence
+      }
+    });
+    
+    return {
+      recommendations,
+      potentialSavings,
+      confidence: averageConfidence,
+      marketFactors
+    };
+  } catch (error) {
+    console.error("Error getting margin optimization recommendations:", error);
+    throw new Error(`Failed to get optimization recommendations: ${error.message}`);
+  }
+}
+
+/**
+ * Create a pledge request
+ * @param userId The user ID
+ * @param params The pledge request parameters
+ * @returns Result of the pledge request
+ */
+export async function createPledgeRequest(
+  userId: number, 
+  params: {
+    broker: string,
+    symbol: string,
+    quantity: number,
+    purpose?: string
+  }
+): Promise<any> {
+  try {
+    const { broker, symbol, quantity, purpose } = params;
+    
+    // Get active broker connection
+    const connection = await storage.getBrokerConnectionByBroker(userId, broker);
+    
+    if (!connection || !connection.isActive) {
+      return {
+        success: false,
+        message: `No active connection found for broker: ${broker}`
+      };
+    }
+    
+    // Generate a pledge ID
+    const pledgeId = `PL${Math.floor(Math.random() * 1000000)}`;
+    
+    // Get quote data for the symbol
+    const quoteData = await getBrokerData(userId, 'quote', { symbol });
+    
+    // For demo purposes, we'll simulate a successful pledge request
+    const pledgeRequest = {
+      id: pledgeId,
+      userId,
+      broker,
+      symbol,
+      quantity,
+      currentPrice: quoteData.price,
+      estimatedValue: quoteData.price * quantity,
+      status: "pending_otp",
+      purpose: purpose || "margin",
+      createdAt: new Date().toISOString()
+    };
+    
+    // Log the pledge request
+    await storage.createEventLog({
+      userId,
+      eventType: 'pledge_request_created',
+      details: {
+        pledgeId,
+        broker,
+        symbol,
+        quantity,
+        estimatedValue: quoteData.price * quantity,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    return {
+      success: true,
+      pledgeId,
+      message: `Pledge request created for ${quantity} shares of ${symbol}`,
+      status: "pending_otp",
+      details: pledgeRequest
+    };
+  } catch (error) {
+    console.error('Error creating pledge request:', error);
+    
+    // Log the error
+    await storage.createEventLog({
+      userId,
+      eventType: 'pledge_request_error',
+      details: {
+        error: error.message,
+      }
+    });
+    
+    return {
+      success: false,
+      message: `Failed to create pledge request: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Create an unpledge request
+ * @param userId The user ID
+ * @param params The unpledge request parameters
+ * @returns Result of the unpledge request
+ */
+export async function createUnpledgeRequest(
+  userId: number, 
+  params: {
+    broker: string,
+    symbol: string,
+    quantity: number,
+    pledgeId?: number,
+    purpose?: string
+  }
+): Promise<any> {
+  try {
+    const { broker, symbol, quantity, pledgeId, purpose } = params;
+    
+    // Get active broker connection
+    const connection = await storage.getBrokerConnectionByBroker(userId, broker);
+    
+    if (!connection || !connection.isActive) {
+      return {
+        success: false,
+        message: `No active connection found for broker: ${broker}`
+      };
+    }
+    
+    // Generate an unpledge ID
+    const unpledgeId = `UP${Math.floor(Math.random() * 1000000)}`;
+    
+    // Get quote data for the symbol
+    const quoteData = await getBrokerData(userId, 'quote', { symbol });
+    
+    // For demo purposes, we'll simulate a successful unpledge request
+    const unpledgeRequest = {
+      id: unpledgeId,
+      userId,
+      broker,
+      symbol,
+      quantity,
+      pledgeId,
+      currentPrice: quoteData.price,
+      estimatedValue: quoteData.price * quantity,
+      status: "pending_otp",
+      purpose: purpose || "free_margin",
+      createdAt: new Date().toISOString()
+    };
+    
+    // Log the unpledge request
+    await storage.createEventLog({
+      userId,
+      eventType: 'unpledge_request_created',
+      details: {
+        unpledgeId,
+        pledgeId,
+        broker,
+        symbol,
+        quantity,
+        estimatedValue: quoteData.price * quantity,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    return {
+      success: true,
+      unpledgeId,
+      message: `Unpledge request created for ${quantity} shares of ${symbol}`,
+      status: "pending_otp",
+      details: unpledgeRequest
+    };
+  } catch (error) {
+    console.error('Error creating unpledge request:', error);
+    
+    // Log the error
+    await storage.createEventLog({
+      userId,
+      eventType: 'unpledge_request_error',
+      details: {
+        error: error.message,
+      }
+    });
+    
+    return {
+      success: false,
+      message: `Failed to create unpledge request: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Request OTP for pledge authorization
+ * @param userId The user ID
+ * @param params The OTP request parameters
+ * @returns Result of the OTP request
+ */
+export async function requestPledgeOTP(
+  userId: number, 
+  params: {
+    broker: string,
+    requestId: string,
+    requestType: 'pledge' | 'unpledge'
+  }
+): Promise<any> {
+  try {
+    const { broker, requestId, requestType } = params;
+    
+    // Get active broker connection
+    const connection = await storage.getBrokerConnectionByBroker(userId, broker);
+    
+    if (!connection || !connection.isActive) {
+      return {
+        success: false,
+        message: `No active connection found for broker: ${broker}`
+      };
+    }
+    
+    // For demo purposes, we'll simulate a successful OTP request
+    // In a real implementation, this would call the broker API
+    
+    // Log the OTP request
+    await storage.createEventLog({
+      userId,
+      eventType: 'pledge_otp_requested',
+      details: {
+        requestId,
+        requestType,
+        broker,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    return {
+      success: true,
+      message: `OTP sent successfully for ${requestType} authorization`,
+      details: {
+        requestId,
+        requestType,
+        otpSentTo: "XXX-XXX-XX89", // Masked phone number
+        validFor: "5 minutes",
+      }
+    };
+  } catch (error) {
+    console.error('Error requesting pledge OTP:', error);
+    
+    // Log the error
+    await storage.createEventLog({
+      userId,
+      eventType: 'pledge_otp_error',
+      details: {
+        error: error.message,
+      }
+    });
+    
+    return {
+      success: false,
+      message: `Failed to request OTP: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Authorize a pledge or unpledge request with OTP
+ * @param userId The user ID
+ * @param params The authorization parameters
+ * @returns Result of the authorization
+ */
+export async function authorizePledgeRequest(
+  userId: number, 
+  params: {
+    broker: string,
+    requestId: string,
+    requestType: 'pledge' | 'unpledge',
+    otp: string
+  }
+): Promise<any> {
+  try {
+    const { broker, requestId, requestType, otp } = params;
+    
+    // Get active broker connection
+    const connection = await storage.getBrokerConnectionByBroker(userId, broker);
+    
+    if (!connection || !connection.isActive) {
+      return {
+        success: false,
+        message: `No active connection found for broker: ${broker}`
+      };
+    }
+    
+    // For demo purposes, we'll simulate a successful authorization
+    // In a real implementation, this would call the broker API to validate the OTP
+    
+    // Verify OTP format for basic validation
+    if (!otp || otp.length !== 6 || !/^\d+$/.test(otp)) {
+      return {
+        success: false,
+        message: "Invalid OTP format. OTP should be 6 digits."
+      };
+    }
+    
+    // Log the authorization
+    await storage.createEventLog({
+      userId,
+      eventType: `${requestType}_request_authorized`,
+      details: {
+        requestId,
+        broker,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    return {
+      success: true,
+      message: `${requestType.charAt(0).toUpperCase() + requestType.slice(1)} request authorized successfully`,
+      details: {
+        requestId,
+        status: "completed",
+        completedAt: new Date().toISOString()
+      }
+    };
+  } catch (error) {
+    console.error(`Error authorizing ${params.requestType} request:`, error);
+    
+    // Log the error
+    await storage.createEventLog({
+      userId,
+      eventType: `${params.requestType}_authorization_error`,
+      details: {
+        error: error.message,
+      }
+    });
+    
+    return {
+      success: false,
+      message: `Failed to authorize request: ${error.message}`
+    };
+  }
+}
+
 export async function placeBrokerOrder(userId: number, orderParams: OrderParameters): Promise<OrderResult> {
   try {
     console.log(`Placing ${orderParams.direction} order for ${orderParams.symbol}, quantity: ${orderParams.quantity}`);
