@@ -1,0 +1,91 @@
+
+================================================================================
+==================== AI Margin Optimizer - Feature Testing =====================
+================================================================================
+
+Initializing services...
+Model loaded from models/margin_optimizer_model.pkl
+
+================================================================================
+=================== 1. Testing Broker Connection (Demo Mode) ===================
+================================================================================
+
+{
+  "success": true,
+  "message": "Connected to icici in demo mode",
+  "broker": "icici",
+  "user_id": "demo_user"
+}
+
+================================================================================
+======================== 2. Testing Portfolio Retrieval ========================
+================================================================================
+
+Portfolio Summary:
+  Total Holdings: 5
+  Total Positions: 2
+  Available Margin: ₹150,000.00
+  Used Margin: ₹350,000.00
+  Total Margin: ₹500,000.00
+  Margin Usage: 70.00%
+
+================================================================================
+======================= 3. Testing Market Data Retrieval =======================
+================================================================================
+
+YF.download() has changed argument auto_adjust default to True
+Market Indices:
+  NIFTY: 22,399.15 (-0.61%)
+  BANKNIFTY: 50,240.15 (-0.54%)
+  SENSEX: 73,847.15 (-0.51%)
+
+Macro Indicators:
+  INR/USD: 86.16 (-0.32%)
+  Crude Oil: 60.29 (-3.30%)
+  Gold: 3,191.50 (+4.42%)
+  US10Y: 4.39 (-0.14%)
+  VIX: 44.96 (+33.73%)
+
+================================================================================
+=============== 4. Testing News Retrieval and Sentiment Analysis ===============
+================================================================================
+
+Note: Running in demo mode since actual API keys are not configured.
+Retrieved 3 news articles related to portfolio holdings
+
+================================================================================
+======================== 5. Testing Sentiment Analysis =========================
+================================================================================
+
+Overall Sentiment Score: 0.22222222222222224
+Sentiment Confidence: 0.55
+
+Symbol-specific Sentiment:
+  RELIANCE: 1.00 (Confidence: 0.55)
+  HDFCBANK: -0.33 (Confidence: 0.55)
+  TCS: 0.00 (Confidence: 0.55)
+
+================================================================================
+======================== 6. Testing Margin Optimization ========================
+================================================================================
+
+Current Margin: ₹350,000.00
+Optimized Margin: ₹332,500.00
+Potential Savings: ₹17,500.00
+Reduction: 5.00%
+Confidence: 85.00%
+Method: ml_model
+
+================================================================================
+=============================== Testing Complete ===============================
+================================================================================
+
+The AI Margin Optimizer is functioning as expected.
+All core features are operational, with the system showing a potential margin reduction
+of 5.00% for the demo portfolio.
+
+In a production environment with real API keys configured, the system would:
+1. Fetch real-time data from NewsAPI and Twitter
+2. Connect to actual broker APIs for portfolio data
+3. Perform more accurate sentiment analysis using Anthropic Claude API
+4. Continuously learn and improve optimization based on market conditions
