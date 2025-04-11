@@ -244,61 +244,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Connect broker
-  app.post("/api/broker/connect", async (req: Request, res: Response) => {
+  // Get broker connections
+  app.get("/api/broker/connections", async (req: Request, res: Response) => {
     try {
-      const authUrl = await connectBroker(DEFAULT_USER_ID, "zerodha");
-      res.json({ authUrl });
+      const connections = await storage.getBrokerConnections(DEFAULT_USER_ID);
+      
+      const formattedConnections = connections.map(conn => {
+        const metadata = conn.metadata as Record<string, any> || {};
+        return {
+          id: conn.id,
+          broker: conn.broker,
+          isActive: conn.isActive,
+          lastUpdated: metadata.connectedAt || metadata.lastConnectionAttempt || new Date().toISOString(),
+          metadata: {
+            accountId: metadata.accountId,
+            name: metadata.name,
+            email: metadata.email
+          }
+        };
+      });
+      
+      res.json(formattedConnections);
     } catch (error) {
-      res.status(500).json({ message: "Failed to connect broker" });
+      console.error('Error getting broker connections:', error);
+      res.status(500).json({ message: "Failed to get broker connections" });
     }
   });
   
-  // Complete broker authorization (for demo purposes only)
-  app.post("/api/broker/authorize", async (req: Request, res: Response) => {
+  // Connect broker (by broker name)
+  app.post("/api/broker/:broker/connect", async (req: Request, res: Response) => {
     try {
-      const broker = "zerodha";
-      const authCode = "demo_auth_code_" + Math.random().toString(36).substring(2, 10);
+      const { broker } = req.params;
       
-      // For demo purposes, always create a new broker connection if one doesn't exist
-      let connection;
-      try {
-        connection = await completeBrokerAuth(DEFAULT_USER_ID, broker as BrokerType, authCode);
-      } catch (error) {
-        // If completeBrokerAuth fails (likely no existing connection), create one directly
-        const brokerConnection: InsertBrokerConnection = {
-          userId: DEFAULT_USER_ID,
-          broker,
-          authToken: `auth_${Math.random().toString(36).substring(2, 15)}`,
-          refreshToken: `refresh_${Math.random().toString(36).substring(2, 15)}`,
-          isActive: true,
-          metadata: { 
-            status: "connected",
-            connectedAt: new Date().toISOString()
-          }
-        };
-        
-        connection = await storage.createBrokerConnection(brokerConnection);
-        
-        // Log the event
-        await storage.createEventLog({
-          userId: DEFAULT_USER_ID,
-          eventType: "broker_connected",
-          details: { 
-            broker,
-            timestamp: new Date().toISOString()
-          }
+      if (!broker || !['zerodha', 'fyers', 'angel', 'upstox', 'iifl'].includes(broker)) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid broker specified" 
         });
       }
+      
+      const redirectUrl = await connectBroker(DEFAULT_USER_ID, broker as BrokerType);
+      
+      res.json({ 
+        success: true,
+        redirectUrl,
+        message: `${broker.charAt(0).toUpperCase() + broker.slice(1)} connection initiated`
+      });
+    } catch (error) {
+      console.error(`Error connecting to broker:`, error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to connect broker: " + error.message 
+      });
+    }
+  });
+  
+  // Check broker connection status
+  app.get("/api/broker/:broker/status", async (req: Request, res: Response) => {
+    try {
+      const { broker } = req.params;
+      
+      if (!broker || !['zerodha', 'fyers', 'angel', 'upstox', 'iifl'].includes(broker)) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid broker specified" 
+        });
+      }
+      
+      const connection = await storage.getBrokerConnectionByBroker(DEFAULT_USER_ID, broker);
+      
+      if (!connection) {
+        return res.json({ 
+          success: true,
+          connected: false,
+          message: "No connection found"
+        });
+      }
+      
+      const metadata = connection.metadata as Record<string, any> || {};
+      const connected = connection.isActive && metadata.status === "connected";
+      
+      res.json({
+        success: true,
+        connected,
+        status: metadata.status || "unknown",
+        lastUpdated: metadata.connectedAt || metadata.lastConnectionAttempt,
+        details: {
+          accountId: metadata.accountId,
+          name: metadata.name
+        }
+      });
+    } catch (error) {
+      console.error(`Error checking broker status:`, error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to check broker status: " + error.message 
+      });
+    }
+  });
+  
+  // Disconnect broker
+  app.post("/api/broker/disconnect/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid connection ID"
+        });
+      }
+      
+      const connection = await storage.getBrokerConnection(id);
+      
+      if (!connection || connection.userId !== DEFAULT_USER_ID) {
+        return res.status(404).json({
+          success: false,
+          message: "Broker connection not found"
+        });
+      }
+      
+      await storage.updateBrokerConnection(id, {
+        isActive: false,
+        metadata: {
+          ...connection.metadata,
+          status: "disconnected",
+          disconnectedAt: new Date().toISOString()
+        }
+      });
+      
+      // Log the event
+      await storage.createEventLog({
+        userId: DEFAULT_USER_ID,
+        eventType: "broker_disconnected",
+        details: { 
+          broker: connection.broker,
+          timestamp: new Date().toISOString(),
+          connectionId: id
+        }
+      });
+      
+      res.json({
+        success: true,
+        message: `Successfully disconnected from ${connection.broker}`
+      });
+    } catch (error) {
+      console.error('Error disconnecting broker:', error);
+      res.status(500).json({
+        success: false, 
+        message: "Failed to disconnect broker: " + error.message
+      });
+    }
+  });
+  
+  // Complete broker authorization (for OAuth callback)
+  app.post("/api/broker/:broker/authorize", async (req: Request, res: Response) => {
+    try {
+      const { broker } = req.params;
+      const { authCode } = req.body;
+      
+      if (!broker || !['zerodha', 'fyers', 'angel', 'upstox', 'iifl'].includes(broker)) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid broker specified" 
+        });
+      }
+      
+      if (!authCode) {
+        return res.status(400).json({
+          success: false,
+          message: "Authorization code is required"
+        });
+      }
+      
+      const connection = await completeBrokerAuth(DEFAULT_USER_ID, broker as BrokerType, authCode);
       
       res.json({ 
         success: true, 
         message: `Successfully connected to ${broker}`,
-        connection
+        connection: {
+          id: connection.id,
+          broker: connection.broker,
+          isActive: connection.isActive
+        }
       });
     } catch (error) {
       console.error('Error authorizing broker:', error);
-      res.status(500).json({ message: "Failed to authorize broker" });
+      res.status(500).json({
+        success: false,
+        message: "Failed to authorize broker: " + error.message
+      });
     }
   });
   
