@@ -35,6 +35,7 @@ const MetricCard = ({ title, value, icon, description, change }: any) => {
 };
 
 export default function MarginOptimizer() {
+  const [_, setLocation] = useLocation();
   const { data: userProfile, isLoading: isLoadingUser } = useQuery({
     queryKey: ['/api/user/profile'],
   });
@@ -61,6 +62,11 @@ export default function MarginOptimizer() {
   // Check if broker is successfully connected
   const isConnected = brokerConnection ? (brokerConnection.success && brokerConnection.connected) : false;
   
+  // Handle broker connection button click
+  const handleConnectBroker = () => {
+    setLocation('/broker');
+  };
+  
   return (
     <div className="flex min-h-screen flex-col">
       <Header userProfile={userProfile} isLoading={isLoadingUser} />
@@ -85,7 +91,12 @@ export default function MarginOptimizer() {
                 <AlertTitle>Broker Not Connected</AlertTitle>
                 <AlertDescription>
                   Please connect your broker account to access margin optimization features.
-                  <Button variant="outline" size="sm" className="mt-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                    onClick={handleConnectBroker}
+                  >
                     Connect Broker
                   </Button>
                 </AlertDescription>
