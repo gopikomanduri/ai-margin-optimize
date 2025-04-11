@@ -1,6 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import Header from "@/components/Header";
-import Navbar from "@/components/Navbar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,9 +10,6 @@ import { Badge } from "@/components/ui/badge";
 
 export default function Portfolio() {
   const [_, setLocation] = useLocation();
-  const { data: userProfile, isLoading: isLoadingUser } = useQuery({
-    queryKey: ['/api/user/profile'],
-  });
   
   // Define broker connection status type
   type BrokerConnectionStatus = {
@@ -50,7 +45,7 @@ export default function Portfolio() {
     enabled: brokerConnection?.connected === true,
   });
   
-  const isLoading = isLoadingUser || isLoadingBroker || isLoadingPortfolio;
+  const isLoading = isLoadingBroker || isLoadingPortfolio;
   // Check if broker is successfully connected
   const isConnected = brokerConnection ? (brokerConnection.success && brokerConnection.connected) : false;
   
