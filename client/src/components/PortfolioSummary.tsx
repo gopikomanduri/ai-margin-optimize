@@ -155,7 +155,7 @@ export function PortfolioSummary({ broker, brokerId }: PortfolioSummaryProps) {
         <CardHeader>
           <CardTitle>Your Holdings</CardTitle>
           <CardDescription>
-            Manage your securities and pledges
+            Manage your securities to optimize margin requirements
           </CardDescription>
         </CardHeader>
         
@@ -342,7 +342,7 @@ export function PortfolioSummary({ broker, brokerId }: PortfolioSummaryProps) {
         <CardFooter className="bg-muted/30 py-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <FaInfoCircle className="h-4 w-4 text-blue-500" />
-            <p>Pledged securities are used as collateral for margin trading.</p>
+            <p>AI Margin Optimizer analyzes market conditions to recommend optimal pledge/unpledge actions for your securities.</p>
           </div>
         </CardFooter>
       </Card>
@@ -353,7 +353,7 @@ export function PortfolioSummary({ broker, brokerId }: PortfolioSummaryProps) {
           <DialogHeader>
             <DialogTitle>Pledge Securities</DialogTitle>
             <DialogDescription>
-              Pledge your holdings to get additional margin for trading.
+              Pledge your holdings based on AI-optimized recommendations for efficient margin utilization.
             </DialogDescription>
           </DialogHeader>
           
@@ -391,7 +391,7 @@ export function PortfolioSummary({ broker, brokerId }: PortfolioSummaryProps) {
                   <div>
                     <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Important Notice</p>
                     <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                      Pledged securities will be locked and can't be sold until they are unpledged. Pledging may take up to 1 business day to complete.
+                      Pledged securities will be locked and can't be sold until they are unpledged. AI Margin Optimizer will continuously monitor market conditions and suggest optimal unpledge timing.
                     </p>
                   </div>
                 </div>
