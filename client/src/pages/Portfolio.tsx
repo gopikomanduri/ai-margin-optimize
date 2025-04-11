@@ -63,8 +63,8 @@ export default function Portfolio() {
   };
   
   return (
-    <div className="p-6">
-      <div className="container">
+    <div className="px-6 py-4">
+      <div>
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight mb-4">Portfolio</h1>
           <p className="text-muted-foreground">
