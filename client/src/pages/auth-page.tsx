@@ -1,133 +1,91 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
 import { useLocation } from "wouter";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
-import { FaLock, FaUser, FaEnvelope, FaArrowRight } from "react-icons/fa";
-
-const loginSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-});
-
-const registerSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  email: z.string().email("Please enter a valid email address"),
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string().min(6, "Confirm password must be at least 6 characters"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
-type RegisterFormValues = z.infer<typeof registerSchema>;
+import { FaArrowRight, FaShieldAlt } from "react-icons/fa";
+import { SiZerodha } from "react-icons/si";
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
-
-  const loginForm = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: "",
-      password: "",
-    },
+  const [loading, setLoading] = useState({
+    zerodha: false,
+    fyers: false,
+    angel: false,
+    upstox: false,
+    iifl: false
   });
 
-  const registerForm = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      username: "",
-      email: "",
-      name: "",
-      password: "",
-      confirmPassword: "",
-    },
-  });
-
-  const onLoginSubmit = async (data: LoginFormValues) => {
-    try {
-      setIsLoading(true);
-      
-      // Simulate login API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // For development only - in production we'd call the real API endpoint
-      // const response = await apiRequest("/api/login", {
-      //   method: "POST",
-      //   body: JSON.stringify({
-      //     username: data.username,
-      //     password: data.password,
-      //   }),
-      // });
-      
-      // Mock successful login for development
-      localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('username', data.username);
-      
-      toast({
-        title: "Login Successful",
-        description: "Welcome to AI Margin Optimizer!",
-      });
-      setLocation("/");
-    } catch (error) {
-      toast({
-        title: "Login Failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  // Simple login for development
+  const handleDirectLogin = () => {
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('username', 'demo_user');
+    toast({
+      title: "Login Successful",
+      description: "Welcome to AI Margin Optimizer!",
+    });
+    setLocation("/");
   };
-
-  const onRegisterSubmit = async (data: RegisterFormValues) => {
+  
+  // Broker connection handler
+  const handleConnect = async (broker: string) => {
     try {
-      setIsLoading(true);
+      setLoading({ ...loading, [broker]: true });
       
-      // Simulate registration API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // For development only - in production we'd call the real API endpoint
-      // const response = await apiRequest("/api/register", {
-      //   method: "POST",
-      //   body: JSON.stringify({
-      //     username: data.username,
-      //     email: data.email,
-      //     name: data.name,
-      //     password: data.password,
-      //   }),
-      // });
-      
-      // Mock successful registration
-      localStorage.setItem('isLoggedIn', 'true');
-      localStorage.setItem('username', data.username);
-      localStorage.setItem('email', data.email);
-      localStorage.setItem('name', data.name);
-      
-      toast({
-        title: "Registration Successful",
-        description: "Your account has been created successfully!",
+      // Initiate OAuth flow with broker
+      const response = await apiRequest(`/api/broker/${broker}/connect`, {
+        method: "POST"
       });
-      setLocation("/");
+      
+      if (response.success && response.redirectUrl) {
+        // Open broker's login page in a new window
+        window.open(response.redirectUrl, "_blank", "width=800,height=600");
+        
+        toast({
+          title: `Connecting to ${broker.charAt(0).toUpperCase() + broker.slice(1)}`,
+          description: "Please complete the login process in the new window."
+        });
+        
+        // Poll for connection status
+        const pollInterval = setInterval(async () => {
+          const statusResponse = await apiRequest(`/api/broker/${broker}/status`, {
+            method: "GET"
+          });
+          
+          if (statusResponse.success && statusResponse.connected) {
+            clearInterval(pollInterval);
+            
+            toast({
+              title: "Connection Successful",
+              description: `Your ${broker.charAt(0).toUpperCase() + broker.slice(1)} account has been connected successfully.`
+            });
+            
+            // Auto login after successful broker connection
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('username', `${broker}_user`);
+            setLocation("/");
+          }
+        }, 3000);
+        
+        // Stop polling after 2 minutes
+        setTimeout(() => {
+          clearInterval(pollInterval);
+        }, 2 * 60 * 1000);
+      } else {
+        throw new Error(response.message || `Failed to initiate ${broker} connection`);
+      }
     } catch (error) {
       toast({
-        title: "Registration Failed",
+        title: "Connection Failed",
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading({ ...loading, [broker]: false });
     }
   };
 
@@ -148,147 +106,149 @@ export default function AuthPage() {
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
               <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
+              <TabsTrigger value="broker">Connect Broker</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
-              <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="login-username">Username</Label>
-                  <div className="relative">
-                    <FaUser className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="login-username"
-                      className="pl-10"
-                      placeholder="Enter your username"
-                      {...loginForm.register("username")}
-                    />
-                  </div>
-                  {loginForm.formState.errors.username && (
-                    <p className="text-sm text-red-500">{loginForm.formState.errors.username.message}</p>
-                  )}
+              <div className="space-y-6 py-4">
+                <div className="text-center mb-6">
+                  <h3 className="text-lg font-medium">Quick Login</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    For demo purposes, you can login directly
+                  </p>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
-                  <div className="relative">
-                    <FaLock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="login-password"
-                      type="password"
-                      className="pl-10"
-                      placeholder="Enter your password"
-                      {...loginForm.register("password")}
-                    />
-                  </div>
-                  {loginForm.formState.errors.password && (
-                    <p className="text-sm text-red-500">{loginForm.formState.errors.password.message}</p>
-                  )}
-                </div>
-
+                
                 <Button 
-                  type="submit" 
                   className="w-full" 
+                  onClick={handleDirectLogin}
                   disabled={isLoading}
                 >
-                  {isLoading ? "Logging in..." : "Log in"}
+                  {isLoading ? "Logging in..." : "Demo Login"}
                 </Button>
-              </form>
+                
+                <div className="relative flex items-center justify-center">
+                  <div className="h-px flex-grow bg-muted"></div>
+                  <span className="mx-3 text-xs text-muted-foreground">OR</span>
+                  <div className="h-px flex-grow bg-muted"></div>
+                </div>
+                
+                <div className="text-center mb-2">
+                  <p className="text-sm text-muted-foreground">
+                    Directly connect with your broker
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Zerodha */}
+                  <Button
+                    variant="outline"
+                    className="flex flex-col items-center justify-center py-6 h-auto hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    onClick={() => handleConnect('zerodha')}
+                    disabled={loading.zerodha}
+                  >
+                    <SiZerodha className="h-8 w-8 mb-2 text-[#387ed1]" />
+                    <span className="font-medium">Zerodha</span>
+                    {loading.zerodha && (
+                      <div className="mt-2 h-3 w-3 animate-spin rounded-full border-b-2 border-blue-600"></div>
+                    )}
+                  </Button>
+                  
+                  {/* FYERS */}
+                  <Button
+                    variant="outline"
+                    className="flex flex-col items-center justify-center py-6 h-auto hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20"
+                    onClick={() => handleConnect('fyers')}
+                    disabled={loading.fyers}
+                  >
+                    <div className="text-xl font-bold mb-2 text-green-600">FYERS</div>
+                    <span className="font-medium">FYERS</span>
+                    {loading.fyers && (
+                      <div className="mt-2 h-3 w-3 animate-spin rounded-full border-b-2 border-green-600"></div>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </TabsContent>
 
-            <TabsContent value="register">
-              <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="register-username">Username</Label>
-                  <div className="relative">
-                    <FaUser className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="register-username"
-                      className="pl-10"
-                      placeholder="Choose a username"
-                      {...registerForm.register("username")}
-                    />
-                  </div>
-                  {registerForm.formState.errors.username && (
-                    <p className="text-sm text-red-500">{registerForm.formState.errors.username.message}</p>
-                  )}
+            <TabsContent value="broker">
+              <div className="space-y-6 py-4">
+                <div className="space-y-2 mb-4">
+                  <h3 className="text-lg font-medium">Connect Your Broker</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Connect your trading account to enable AI-powered margin optimization
+                  </p>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="register-email">Email</Label>
-                  <div className="relative">
-                    <FaEnvelope className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="register-email"
-                      type="email"
-                      className="pl-10"
-                      placeholder="Enter your email"
-                      {...registerForm.register("email")}
-                    />
-                  </div>
-                  {registerForm.formState.errors.email && (
-                    <p className="text-sm text-red-500">{registerForm.formState.errors.email.message}</p>
-                  )}
+                
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Zerodha */}
+                  <Button
+                    variant="outline"
+                    className="flex items-center justify-between p-6 h-auto hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    onClick={() => handleConnect('zerodha')}
+                    disabled={loading.zerodha}
+                  >
+                    <div className="flex items-center gap-3">
+                      <SiZerodha className="h-8 w-8 text-[#387ed1]" />
+                      <div className="text-left">
+                        <div className="font-semibold text-lg">Connect with Zerodha</div>
+                        <div className="text-sm text-muted-foreground">India's largest broker</div>
+                      </div>
+                    </div>
+                    {loading.zerodha ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-blue-600"></div>
+                    ) : (
+                      <FaShieldAlt className="h-5 w-5 text-blue-600" />
+                    )}
+                  </Button>
+                  
+                  {/* FYERS */}
+                  <Button
+                    variant="outline"
+                    className="flex items-center justify-between p-6 h-auto hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20"
+                    onClick={() => handleConnect('fyers')}
+                    disabled={loading.fyers}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="font-bold text-xl text-green-600 h-8 w-8 flex items-center">F</div>
+                      <div className="text-left">
+                        <div className="font-semibold text-lg">Connect with FYERS</div>
+                        <div className="text-sm text-muted-foreground">Tech-first trading platform</div>
+                      </div>
+                    </div>
+                    {loading.fyers ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-green-600"></div>
+                    ) : (
+                      <FaShieldAlt className="h-5 w-5 text-green-600" />
+                    )}
+                  </Button>
+                  
+                  {/* Angel One */}
+                  <Button
+                    variant="outline"
+                    className="flex items-center justify-between p-6 h-auto hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                    onClick={() => handleConnect('angel')}
+                    disabled={loading.angel}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="font-bold text-xl text-purple-600 h-8 w-8 flex items-center">A</div>
+                      <div className="text-left">
+                        <div className="font-semibold text-lg">Connect with Angel One</div>
+                        <div className="text-sm text-muted-foreground">Popular retail broker</div>
+                      </div>
+                    </div>
+                    {loading.angel ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-purple-600"></div>
+                    ) : (
+                      <FaShieldAlt className="h-5 w-5 text-purple-600" />
+                    )}
+                  </Button>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="register-name">Full Name</Label>
-                  <div className="relative">
-                    <FaUser className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="register-name"
-                      className="pl-10"
-                      placeholder="Enter your full name"
-                      {...registerForm.register("name")}
-                    />
-                  </div>
-                  {registerForm.formState.errors.name && (
-                    <p className="text-sm text-red-500">{registerForm.formState.errors.name.message}</p>
-                  )}
+                
+                <div className="flex items-center gap-2 text-xs text-center text-gray-500 justify-center mt-4">
+                  <FaShieldAlt className="h-3 w-3" />
+                  <p>We use secure OAuth connections. Your credentials are never stored on our servers.</p>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="register-password">Password</Label>
-                  <div className="relative">
-                    <FaLock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="register-password"
-                      type="password"
-                      className="pl-10"
-                      placeholder="Create a password"
-                      {...registerForm.register("password")}
-                    />
-                  </div>
-                  {registerForm.formState.errors.password && (
-                    <p className="text-sm text-red-500">{registerForm.formState.errors.password.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="register-confirm-password">Confirm Password</Label>
-                  <div className="relative">
-                    <FaLock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="register-confirm-password"
-                      type="password"
-                      className="pl-10"
-                      placeholder="Confirm your password"
-                      {...registerForm.register("confirmPassword")}
-                    />
-                  </div>
-                  {registerForm.formState.errors.confirmPassword && (
-                    <p className="text-sm text-red-500">{registerForm.formState.errors.confirmPassword.message}</p>
-                  )}
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Creating account..." : "Create Account"}
-                </Button>
-              </form>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
